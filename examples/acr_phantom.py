@@ -40,23 +40,27 @@ def main() -> int:
     series = index_series(args.data)
     g = series.geometry
     v = series.views
-    print(f"{len(series)} views, {v.views_per_rotation:.1f} per rotation, "
-          f"{v.rotations:.3f} rotations, pitch {v.pitch(g):.4f}")
-    print(f"geometry: SID {g.source_to_isocentre} mm, SDD {g.source_to_detector:.1f} mm, "
-          f"{g.n_channels}x{g.n_rows}, {g.detector_shape}, {g.focal_spot_mode}")
+    print(
+        f"{len(series)} views, {v.views_per_rotation:.1f} per rotation, "
+        f"{v.rotations:.3f} rotations, pitch {v.pitch(g):.4f}"
+    )
+    print(
+        f"geometry: SID {g.source_to_isocentre} mm, SDD {g.source_to_detector:.1f} mm, "
+        f"{g.n_channels}x{g.n_rows}, {g.detector_shape}, {g.focal_spot_mode}"
+    )
     classes = v.focal_spot_classes()
     print(f"focal-spot classes: {[c.size for c in classes]}")
     for k, idx in enumerate(classes):
         print(f"  class {k}: dz {v.ffs_dz[idx][0]:+.3f} mm, drho {v.ffs_drho[idx][0]:+.3f} mm")
 
     sino = single_slice_rebin(series, args.z, focal_spot_class=0)
-    print(f"\nrebinned at z = {sino.z} mm: {sino.meta['n_views']} views, "
-          f"rows {sino.meta['detector_rows_used'][0]:.1f}..{sino.meta['detector_rows_used'][1]:.1f}")
+    print(
+        f"\nrebinned at z = {sino.z} mm: {sino.meta['n_views']} views, "
+        f"rows {sino.meta['detector_rows_used'][0]:.1f}..{sino.meta['detector_rows_used'][1]:.1f}"
+    )
     print(f"  ray drift in z at r = 100 mm: {sino.drift_at_radius(100.0):.2f} mm")
 
-    recon = fan_beam_fbp(
-        sino.sinogram, g, sino.angles, fov=args.fov, n_pixels=args.pixels
-    )
+    recon = fan_beam_fbp(sino.sinogram, g, sino.angles, fov=args.fov, n_pixels=args.pixels)
     hu = to_hu(recon.image, g.water_attenuation)
     X, Y = recon.pixel_coordinates()
     r = np.hypot(X, Y)
@@ -64,9 +68,11 @@ def main() -> int:
     print(f"outside          : {hu[(r > 115) & (r < 130)].mean():+.1f} HU  (air = -1000)")
 
     circle = fit_edge_circle(hu, recon.spacing, search_range=(85.0, 112.0))
-    print(f"\nedge circle: R = {circle.radius:.3f} mm (diameter {2 * circle.radius:.2f} mm), "
-          f"residual sd {circle.residual_sd * 1000:.0f} um, ellipticity "
-          f"{circle.ellipticity * 1000:.0f} um")
+    print(
+        f"\nedge circle: R = {circle.radius:.3f} mm (diameter {2 * circle.radius:.2f} mm), "
+        f"residual sd {circle.residual_sd * 1000:.0f} um, ellipticity "
+        f"{circle.ellipticity * 1000:.0f} um"
+    )
 
     mtf = radial_mtf(hu, recon.spacing, circle, band=6.0, background="asymptote")
     f = np.linspace(1e-6, 1.0, 500)
@@ -75,8 +81,10 @@ def main() -> int:
     print(f"MTF50 measured   : {mtf.mtf50:.3f} cyc/mm")
     print(f"MTF10 measured   : {mtf.mtf10:.3f} cyc/mm")
     print(f"MTF50 the sampling chain alone allows : {chain50:.3f} cyc/mm")
-    print(f"  background tails: {mtf.meta['tail_slope_inner_fraction'] * 100:+.2f} % inner, "
-          f"{mtf.meta['tail_slope_outer_fraction'] * 100:+.2f} % outer of contrast")
+    print(
+        f"  background tails: {mtf.meta['tail_slope_inner_fraction'] * 100:+.2f} % inner, "
+        f"{mtf.meta['tail_slope_outer_fraction'] * 100:+.2f} % outer of contrast"
+    )
     print(
         "  anything blurrier than the sampling chain is the scanner (focal spot, detector "
         "response), not the code: the pipeline reproduces a closed form to 0.02 HU."

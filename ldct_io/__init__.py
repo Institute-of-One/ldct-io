@@ -38,6 +38,7 @@ from ldct_io.recon import (
     backproject,
     fan_beam_fbp,
     filter_projections,
+    parker_weights,
     ramp_kernel,
     to_hu,
 )
@@ -62,6 +63,7 @@ __all__ = [
     "fan_beam_fbp",
     "filter_projections",
     "backproject",
+    "parker_weights",
     "ramp_kernel",
     "to_hu",
     # closed-form references

@@ -219,6 +219,22 @@ class ScanGeometry:
         return float(self.n_channels * self.channel_angle_spacing)
 
     @property
+    def half_fan_angle(self) -> float:
+        """Largest fan angle of any channel [rad].
+
+        Not half of :attr:`fan_angle`: the central ray sits at a fractional channel (the
+        quarter-detector offset), so the fan is slightly asymmetric and the short-scan range
+        is set by the *larger* side. Using half the full fan instead leaves the short scan a
+        fraction of a degree short of complete, which Parker weighting then cannot fix.
+        """
+        return float(np.abs(self.channel_angles()).max())
+
+    @property
+    def short_scan_range(self) -> float:
+        """Source rotation a short scan needs, ``pi + 2 * half_fan_angle`` [rad]."""
+        return float(np.pi + 2.0 * self.half_fan_angle)
+
+    @property
     def transverse_spacing_at_isocentre(self) -> float:
         """Detector element pitch projected back to the isocentre [mm].
 

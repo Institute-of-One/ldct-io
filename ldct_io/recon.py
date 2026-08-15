@@ -80,6 +80,50 @@ def ramp_kernel(n_channels: int, d_gamma: float) -> np.ndarray:
     return g
 
 
+def parker_weights(geometry: ScanGeometry, angles: np.ndarray) -> np.ndarray:
+    r"""Parker weights for a short scan, ``(n_views, n_channels)``.
+
+    Over :math:`\pi + 2\Gamma` of source rotation every line through the object is measured
+    once, except in two wedges at the ends of the range where it is measured twice. Weighting
+    those wedges so that each pair of conjugate rays sums to one is what makes a short scan
+    reconstruct to the same values as a full rotation; without it the doubly-measured
+    directions are counted twice and the image gains a smooth, plausible-looking bias.
+
+    The advantage of paying that price is in z: a short scan spans half the axial travel of a
+    full rotation, so in a helical acquisition it halves how far each ray strays from the
+    plane being reconstructed.
+    """
+    angles = np.asarray(angles, dtype=np.float64)
+    gamma = geometry.channel_angles()
+    half_fan = geometry.half_fan_angle
+
+    beta = np.unwrap(angles)
+    beta = np.abs(beta - beta[0])  # measured from the start, whichever way the gantry turns
+    # One view covers its own angular step, so the range spanned is the last angle plus a step.
+    span = float(beta[-1] + np.abs(np.diff(beta)).mean())
+    required = geometry.short_scan_range
+    if span < required - 1e-3:
+        raise ValueError(
+            f"a short scan needs at least pi + 2*half-fan = {np.degrees(required):.1f} deg, "
+            f"got {np.degrees(span):.1f} deg"
+        )
+
+    b = beta[:, None]
+    g = gamma[None, :]
+    w = np.ones((angles.size, geometry.n_channels), dtype=np.float64)
+
+    lead = 2.0 * (half_fan - g)
+    rising = b < lead
+    w[rising] = (np.sin(np.pi / 4.0 * np.divide(b, np.maximum(lead, 1e-12)) * 2.0) ** 2)[rising]
+
+    trail_start = np.pi - 2.0 * g
+    falling = b > trail_start
+    arg = (np.pi + 2.0 * half_fan - b) / np.maximum(2.0 * (half_fan + g), 1e-12)
+    w[falling] = (np.sin(np.pi / 4.0 * arg * 2.0) ** 2)[falling]
+
+    return np.clip(w, 0.0, 1.0)
+
+
 def filter_projections(
     sinogram: np.ndarray, geometry: ScanGeometry, *, apodisation: str = "none"
 ) -> np.ndarray:
@@ -199,27 +243,59 @@ def fan_beam_fbp(
     n_pixels: int = 512,
     apodisation: str = "none",
     source_radius: np.ndarray | float | None = None,
+    short_scan: bool = False,
 ) -> ReconResult:
     """Reconstruct one slice from an equiangular fan-beam sinogram.
 
-    The views must cover a full rotation; a short scan needs Parker weighting, which is not
-    implemented, and silently reconstructing an under-covered set produces a plausible image
-    with the wrong contrast.
+    Parameters
+    ----------
+    sinogram:
+        ``(n_views, n_channels)`` of line integrals.
+    geometry:
+        The acquisition geometry.
+    angles:
+        Source angle of every view [rad].
+    fov, n_pixels:
+        Field of view [mm] and grid size.
+    apodisation:
+        Passed to :func:`filter_projections`.
+    source_radius:
+        Per-view source-to-isocentre distance, if the focal spot is displaced radially.
+    short_scan:
+        ``False`` (default) requires a full rotation. ``True`` accepts
+        :attr:`~ldct_io.geometry.ScanGeometry.short_scan_range` and applies
+        :func:`parker_weights`. Reconstructing an under-covered set *without* those weights
+        produces a plausible image with the wrong values, so the choice is explicit rather
+        than inferred from the data.
+
     """
     angles = np.asarray(angles, dtype=np.float64)
     covered = float(np.abs(np.unwrap(angles)[-1] - np.unwrap(angles)[0]))
     step = float(np.abs(np.diff(np.unwrap(angles))).mean())
-    if covered + step < 2.0 * np.pi - 1e-3:
+    if not short_scan and covered + step < 2.0 * np.pi - 1e-3:
         raise ValueError(
             f"views cover {np.degrees(covered + step):.1f} deg, less than a full rotation. "
-            f"Short-scan reconstruction needs Parker weighting, which this function does not "
-            f"apply; the result would be quietly wrong rather than obviously wrong."
+            f"Pass short_scan=True to apply Parker weighting; without it the result would be "
+            f"quietly wrong rather than obviously wrong."
         )
+
+    sinogram = np.asarray(sinogram, dtype=np.float64)
+    if short_scan:
+        sinogram = sinogram * parker_weights(geometry, angles)
 
     filtered = filter_projections(sinogram, geometry, apodisation=apodisation)
     image = backproject(
         filtered, geometry, angles, fov=fov, n_pixels=n_pixels, source_radius=source_radius
     )
+
+    # A full rotation measures every line through the object twice, once from each side, and
+    # the equiangular kernel used here carries that redundancy in its normalisation. Parker
+    # weights make a short scan count every line exactly once instead, so the same kernel
+    # returns half the attenuation — an error that looks entirely plausible in an image and is
+    # caught only by comparing against a known value. Undo it explicitly.
+    if short_scan:
+        image = image * 2.0
+
     return ReconResult(
         image=image,
         spacing=fov / n_pixels,
@@ -228,6 +304,7 @@ def fan_beam_fbp(
             "n_views": int(angles.size),
             "angular_coverage_deg": float(np.degrees(covered + step)),
             "apodisation": apodisation,
+            "short_scan": short_scan,
             "filter": "equiangular ramp (Kak & Slaney 3.4)",
             "interpolation": "linear in the channel direction",
         },

@@ -14,6 +14,7 @@ from ldct_io import (
     disk_sinogram,
     fan_beam_fbp,
     fit_edge_circle,
+    parker_weights,
     radial_mtf,
     ramp_kernel,
     sampling_chain_mtf,
@@ -79,12 +80,73 @@ def test_a_point_detector_is_sharper_than_an_averaged_one(flash, full_rotation):
     assert out[1] > out[7], f"point-sampled {out[1]:.3f} should exceed averaged {out[7]:.3f}"
 
 
-def test_short_scan_is_refused(flash):
-    """Under-covered views reconstruct to a plausible image with the wrong contrast."""
+def test_short_scan_without_parker_weights_is_refused(flash):
+    """Under-covered views reconstruct to a plausible image with the wrong values."""
     angles = np.linspace(0.0, np.pi, 300, endpoint=False)
     sinogram = disk_sinogram(flash, RADIUS, MU, angles)
     with pytest.raises(ValueError, match="less than a full rotation"):
         fan_beam_fbp(sinogram, flash, angles, fov=FOV, n_pixels=64)
+
+
+def test_a_weighted_short_scan_agrees_with_a_full_rotation(flash):
+    """Parker weighting is what makes half a rotation give the same numbers as a whole one.
+
+    This is the check that matters for helical data: a short scan halves how far the source
+    travels in z, and is only worth using if it costs nothing in the reconstructed values.
+    """
+    full_angles = np.linspace(0.0, 2.0 * np.pi, 576, endpoint=False)
+    full = fan_beam_fbp(
+        disk_sinogram(flash, RADIUS, MU, full_angles),
+        flash,
+        full_angles,
+        fov=FOV,
+        n_pixels=256,
+    )
+
+    span = flash.short_scan_range
+    n_short = int(np.ceil(576 * span / (2 * np.pi))) + 1
+    short_angles = np.linspace(0.0, span, n_short, endpoint=False)
+    short = fan_beam_fbp(
+        disk_sinogram(flash, RADIUS, MU, short_angles),
+        flash,
+        short_angles,
+        fov=FOV,
+        n_pixels=256,
+        short_scan=True,
+    )
+
+    hu_full = to_hu(full.image, flash.water_attenuation)
+    hu_short = to_hu(short.image, flash.water_attenuation)
+    X, Y = full.pixel_coordinates()
+    r = np.hypot(X, Y)
+
+    assert abs(hu_short[r < 20].mean()) < 3.0, (
+        f"short scan reads {hu_short[r < 20].mean():+.2f} HU at the centre, truth 0"
+    )
+    assert abs(hu_short[r < 20].mean() - hu_full[r < 20].mean()) < 3.0
+    assert abs(hu_short[(r > 115) & (r < 125)].mean() + 1000.0) < 5.0
+
+
+def test_parker_weights_sum_to_one_over_conjugate_rays(flash):
+    """The point of the weights: every line through the object is counted exactly once."""
+    span = flash.short_scan_range
+    angles = np.linspace(0.0, span, 900, endpoint=False)
+    w = parker_weights(flash, angles)
+
+    assert w.min() >= 0.0 and w.max() <= 1.0
+    # The central channel: weights at beta and its conjugate beta + pi must sum to 1.
+    centre = int(round(flash.central_channel))
+    beta = angles
+    for b in (0.05, 0.15, 0.25):
+        i = int(np.argmin(np.abs(beta - b)))
+        j = int(np.argmin(np.abs(beta - (b + np.pi))))
+        assert w[i, centre] + w[j, centre] == pytest.approx(1.0, abs=0.02)
+
+
+def test_parker_weights_refuse_too_little_coverage(flash):
+    angles = np.linspace(0.0, np.pi * 0.8, 200, endpoint=False)
+    with pytest.raises(ValueError, match="short scan needs at least"):
+        parker_weights(flash, angles)
 
 
 def test_ramp_kernel_matches_its_closed_form(flash):

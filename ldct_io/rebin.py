@@ -1,15 +1,38 @@
 """Turn a helical acquisition into the circular fan-beam sinogram of one slice.
 
-Single-slice rebinning, which is what this module implements, picks for every view the
-detector row whose ray crosses the target plane *at the isocentre*. Away from the isocentre
-that ray drifts in z, by up to ``r * (row offset) / source_to_detector``, so the approximation
-is exact only where the object does not vary along z — a cylindrical phantom wall, a uniform
-module — and degrades where it does. The degradation is visible, not subtle: slices near a
-joint between dissimilar objects streak.
+Single-slice rebinning assigns to each output ray one measured ray, chosen by its detector
+row. Two choices of row are offered here: the naive one, which puts the ray in the target
+plane at the isocentre, and the ``cos(gamma)`` one, which puts it there where it comes closest
+to the rotation axis. Neither can do anything about the fact that a measured ray is *tilted*
+with respect to the plane: at radius ``r`` it has already strayed
+``r * (z0 - z_source) / source_to_isocentre`` out of it. That is a property of the ray, not of
+which row is picked.
 
-That is why this module reports the drift it will incur rather than only the sinogram: the
-number tells you whether the slice you asked for is one this method can give you. Rebinning
-that is correct for a varying object (Noo et al.) belongs here too and is not yet written.
+How much that matters was measured against the vendor's own reconstruction of the same
+projections (a chest scan, 64 x 0.6 mm, pitch 0.9):
+
+===============================  ==============  =========
+configuration                    air [HU]        r vs vendor
+===============================  ==============  =========
+naive row, full rotation         -815 +- 666     0.855
+cos(gamma) row, full rotation    refused: the plane is not covered at the fan edges
+naive row, short scan            -757 +- 1041    0.736
+cos(gamma) row, short scan       -758 +- 1039    0.735
+vendor                          -1004 +-   22    1
+===============================  ==============  =========
+
+So: the row correction changes nothing measurable, the short scan is worse (fewer views, and
+Parker weights pair conjugate rays that a helix has placed at different z), and all of them
+streak badly. The one thing the correction did do was refuse a slice the naive choice had
+silently accepted — asking for the right rows revealed that a full rotation does not in fact
+cover that plane out at the fan edges.
+
+The conclusion is not that the rebinning needs tuning. It is that no single-slice rebinning
+reconstructs patient anatomy from this acquisition, and what is needed is a backprojection
+along the rays as measured, in three dimensions (Stierstorfer et al.'s weighted FBP is the
+published algorithm for this scanner family). On an object that does not vary along z —
+a cylindrical phantom — this module remains exact, which is why the ACR phantom reconstructs
+cleanly through it and a chest does not.
 """
 
 from __future__ import annotations
@@ -66,6 +89,8 @@ def single_slice_rebin(
     *,
     focal_spot_class: int | None = 0,
     max_rotations: float = 1.0,
+    cos_gamma_correction: bool = True,
+    coverage: str = "full",
 ) -> SliceSinogram:
     """Rebin a helical series to the circular sinogram of the plane at ``z``.
 
@@ -82,18 +107,30 @@ def single_slice_rebin(
         on a two-position flying focal spot. ``None`` uses every view and returns the per-view
         source radius so the backprojector can account for the deflection itself.
     max_rotations:
-        Rotations of data to use. One full rotation is the minimum this reconstruction
-        supports.
+        Rotations of data to use, before ``coverage`` clamps it.
+    cos_gamma_correction:
+        Choose each ray's detector row as a function of its fan angle, so that every ray meets
+        the reconstruction plane where it comes closest to the rotation axis. On by default;
+        turning it off reproduces the naive choice, which places the outer channels in the
+        wrong plane.
+    coverage:
+        ``"full"`` uses a whole rotation. ``"short"`` uses π plus the fan angle, which halves
+        how far the source travels in z and therefore halves the cone-angle error — at the
+        price of needing Parker weighting in the reconstruction (pass ``short_scan=True`` to
+        :func:`~ldct_io.recon.fan_beam_fbp`).
 
     Raises
     ------
     ValueError
-        The plane is not covered by the detector over a full rotation — the series does not
-        contain enough data to reconstruct it.
+        The plane is not covered by the detector over the angular range asked for — the series
+        does not contain enough data to reconstruct it.
 
     """
     views_all = series.views
     geometry = series.geometry
+
+    if coverage not in ("full", "short"):
+        raise ValueError(f"coverage must be 'full' or 'short', got {coverage!r}")
 
     if focal_spot_class is None:
         candidates = np.arange(len(views_all))
@@ -107,11 +144,13 @@ def single_slice_rebin(
         candidates = classes[focal_spot_class]
 
     z_source = views_all.axial_position[candidates] + views_all.ffs_dz[candidates]
-    row_step = geometry.axial_spacing_at_isocentre
-    row_needed = geometry.central_row + (z - z_source) / row_step
+    radius = geometry.source_to_isocentre + views_all.ffs_drho[candidates]
 
     step = float(np.abs(np.diff(np.unwrap(views_all.angle[candidates]))).mean())
     per_rotation = int(round(2.0 * np.pi / step))
+    if coverage == "short":
+        # A little over the minimum, so that discretising to whole views cannot land under it.
+        max_rotations = min(max_rotations, geometry.short_scan_range / (2.0 * np.pi) + 0.005)
     n_take = int(round(per_rotation * max_rotations))
     if n_take < 8:
         raise ValueError(f"only {n_take} views per rotation in this class; that is not a scan")
@@ -124,18 +163,38 @@ def single_slice_rebin(
             f"({max_rotations:.2f} rotation(s)) around it"
         )
     take = slice(start, start + n_take)
-    rows = row_needed[take]
-    if rows.min() < 0.0 or rows.max() > geometry.n_rows - 1:
+    chosen = candidates[take]
+
+    # The row each ray needs, as a function of the fan angle as well as the view.
+    #
+    # A ray (beta, gamma) approaches the rotation axis most closely at a path length
+    # R cos(gamma) from the source, and it is *there* that it should sit in the plane being
+    # reconstructed -- that point is what the ray contributes to the 2-D sinogram. Requiring
+    # it gives (v - v0) = (z0 - z_s) * SDD / (R cos(gamma) * dv), which reduces to the naive
+    # choice only on the central ray. Ignoring the cos(gamma) puts the outer channels in the
+    # wrong plane by up to (1/cos(Gamma) - 1) of the row offset, ~10 % at a 25 deg half-fan.
+    gamma = geometry.channel_angles() if cos_gamma_correction else np.zeros(geometry.n_channels)
+    scale = geometry.source_to_detector / geometry.axial_spacing
+    rows = geometry.central_row + (
+        (z - z_source[take])[:, None] * scale / (radius[take][:, None] * np.cos(gamma)[None, :])
+    )
+
+    if rows.min() < -0.5 or rows.max() > geometry.n_rows - 0.5:
         raise ValueError(
             f"the plane z = {z} mm needs detector rows {rows.min():.1f}..{rows.max():.1f} of "
-            f"0..{geometry.n_rows - 1} over a full rotation: it is not covered by the beam. "
-            f"Choose a z further inside the scanned range."
+            f"0..{geometry.n_rows - 1} over this angular range: it is not covered by the beam. "
+            f"Choose a z further inside the scanned range, or coverage='short'."
         )
+    rows = np.clip(rows, 0.0, geometry.n_rows - 1)
 
-    chosen = candidates[take]
-    sinogram = np.stack(
-        [series.read_row(int(v), float(row)) for v, row in zip(chosen, rows, strict=True)]
-    )
+    sinogram = np.empty((chosen.size, geometry.n_channels), dtype=np.float64)
+    channel = np.arange(geometry.n_channels)
+    for k, view in enumerate(chosen):
+        frame = series.read_frame(int(view))
+        lo = np.floor(rows[k]).astype(np.int32)
+        lo = np.clip(lo, 0, geometry.n_rows - 2)
+        w = rows[k] - lo
+        sinogram[k] = frame[channel, lo] * (1.0 - w) + frame[channel, lo + 1] * w
 
     max_row_offset = float(np.abs(rows - geometry.central_row).max())
     drift_per_mm = max_row_offset * geometry.axial_spacing / geometry.source_to_detector
@@ -143,19 +202,34 @@ def single_slice_rebin(
     return SliceSinogram(
         sinogram=sinogram,
         angles=views_all.angle[chosen],
-        source_radius=geometry.source_to_isocentre + views_all.ffs_drho[chosen],
+        source_radius=radius[take],
         z=float(z),
         views=chosen,
         axial_drift_at=drift_per_mm,
         meta={
-            "method": "single-slice rebinning",
+            "method": "single-slice rebinning"
+            + (" with the cos(gamma) row correction" if cos_gamma_correction else ""),
+            "coverage": coverage,
             "focal_spot_class": focal_spot_class,
             "n_views": int(chosen.size),
             "views_per_rotation": per_rotation,
+            "angular_coverage_deg": float(
+                np.degrees(
+                    abs(
+                        np.unwrap(views_all.angle[chosen])[-1]
+                        - np.unwrap(views_all.angle[chosen])[0]
+                    )
+                    + step
+                )
+            ),
             "detector_rows_used": (float(rows.min()), float(rows.max())),
+            "source_offset_mm": (
+                float((z - z_source[take]).min()),
+                float((z - z_source[take]).max()),
+            ),
             "note": (
                 "exact only where the object does not vary along z; "
-                f"rays drift {drift_per_mm:.4f} mm in z per mm of radius"
+                f"rays drift up to {drift_per_mm:.4f} mm in z per mm of radius"
             ),
         },
     )
