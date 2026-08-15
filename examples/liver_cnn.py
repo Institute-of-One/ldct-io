@@ -4,14 +4,13 @@ The comparison a reviewer will ask for. A residual CNN is trained on real quarte
 full-dose pairs from eight liver cases and evaluated on four it never saw, beside the
 classical denoisers, against the closed-form ceiling of ``liver_ceiling.py``.
 
-What it is, and is not
-----------------------
-This is ``denoiq_core``'s residual CNN: six layers, 24 channels, 21 385 parameters, trained
-here for 16 epochs on 6 400 patches on a CPU. It is *not* RED-CNN, which has roughly eighty
-times as many parameters and is trained for far longer. Its validation loss had flattened by
-the sixth epoch, so what limits it is capacity rather than training, and a larger network
-would certainly reach a higher PSNR. Whether it would also reach a higher detectability is
-the question this file is built to ask, and the answer here is only about this network.
+Run it at either capacity::
+
+    python examples/liver_cnn.py --preset small   # 21 k parameters
+    python examples/liver_cnn.py --preset large   # 1.85 M, RED-CNN's scale
+
+Two capacities, because "the network did worse on the task" has to be told apart from "the
+network was too small".
 
 Two things are held fixed so the comparison means something:
 
@@ -29,22 +28,37 @@ evaluation, and only so that the task has a ground truth.
 
 The result
 ----------
-On 1000 held-out pairs from four unseen cases, against a ceiling of 8.09:
+1000 held-out pairs from four unseen cases, ceiling d' = 8.087:
 
-    unprocessed          d' 6.03   0.75x   PSNR 23.81 dB
-    tv 1x noise          d' 6.09   0.75x   PSNR 28.07 dB
-    nlm 0.8x noise       d' 5.50   0.68x   PSNR 27.50 dB
-    gaussian 0.75 mm     d' 5.10   0.63x   PSNR 28.04 dB
-    CNN                  d' 5.29   0.65x   PSNR 28.71 dB
+    method              d'      of ceiling   PSNR
+    tv 1x noise         6.09      0.75x      28.07 dB
+    unprocessed         6.03      0.75x      23.81 dB
+    nlm 0.8x noise      5.50      0.68x      27.50 dB
+    CNN 21 k            5.31      0.66x      28.74 dB
+    gaussian 0.75 mm    5.10      0.63x      28.04 dB
+    CNN 1.85 M          4.96      0.61x      28.77 dB   <- best PSNR of all seven
+    gaussian 1.00 mm    4.83      0.60x      27.85 dB
 
-The network takes the best PSNR of the six, +4.90 dB over the unprocessed input, and gives
-back 12 % of the detectability. Total variation, at a *lower* PSNR, gives back none of it.
-Ranking these methods by the fidelity metric the denoising literature reports puts them in
-close to the opposite order from ranking them by the task, and nothing exceeded the ceiling.
+    above the ceiling: 0 of 7
+    Spearman(PSNR, d') across the seven methods: -0.29
+
+Eighty-seven times the parameters, three and a half times the training data, a genuinely
+better validation loss (5.00 against 5.67) -- and 0.03 dB more PSNR for 7 % less
+detectability than the small network. Raising capacity improved the objective the network
+was trained on and made the task worse. The ranking does not flip, so the earlier result was
+not an artefact of a small network.
+
+Two honest notes. The large network's validation loss bottomed at epoch 20 and drifted up
+slightly to epoch 60, so the saved model is not quite the best one; best-epoch checkpointing
+would recover about 0.06 of validation loss, which is far too little to move d'. And +0.03 dB
+for 87x the capacity is itself worth noticing: the training target is a *full-dose
+reconstruction*, which has noise of its own that no network can predict, so mean-squared
+error against it saturates well before the image does.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import time
 from pathlib import Path
@@ -58,7 +72,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from denoiq_core.cnn import (
-    DEFAULT_CNN,
+    CNNConfig,
     build_cnn,
     denoise_stack,
     estimate_noise_sd,
@@ -82,8 +96,6 @@ OUTDIR = Path(
     r"C:\Users\YAMAMO~1\AppData\Local\Temp\claude\D--DevGit-DICOM-Viewer"
     r"\4b28a974-1910-45c1-aa13-1fed27b3f70c\scratchpad"
 )
-CHECKPOINT = OUTDIR / "liver_cnn.pt"
-
 ALL_CASES = sorted(p.name for p in ROOT.glob("L0*"))
 TRAIN_CASES, TEST_CASES = ALL_CASES[:8], ALL_CASES[8:]
 
@@ -91,8 +103,27 @@ PATCH, ROI = 64, 48
 DOSE = SIMULATED_DOSE_FRACTION["ABDOMEN"]
 LESION_MM, LESION_HU, LESION_EDGE_SIGMA_MM = 8.0, -25.0, 0.5
 SEED, N_FOLDS = 0, 5
-N_PATCHES_PER_CASE, EPOCHS, BATCH, LR = 800, 16, 32, 1e-3
 NOISE_HU = 25.0
+
+#: Two capacities, so that "the network did worse on the task" can be told apart from "the
+#: network was too small". The large one is RED-CNN's scale: ten layers, 96 channels, 5x5
+#: kernels, about 1.85 M parameters against the small one's 21 k.
+PRESETS: dict[str, dict[str, Any]] = {
+    "small": dict(
+        cnn=CNNConfig(depth=6, width=24, kernel_size=3, residual=True),
+        patches=800,
+        epochs=16,
+        batch=32,
+        lr=1e-3,
+    ),
+    "large": dict(
+        cnn=CNNConfig(depth=10, width=96, kernel_size=5, residual=True),
+        patches=3000,
+        epochs=60,
+        batch=64,
+        lr=1e-3,
+    ),
+}
 
 
 def invertible(grid: np.ndarray, ridge: float = 1e-2, floor: float = 1e-3) -> np.ndarray:
@@ -124,7 +155,9 @@ def cross_fitted_paired(present: np.ndarray, absent: np.ndarray, spacing: float)
     return paired_d_prime(sp, sa)
 
 
-def training_pairs(cases: list[str], *, seed: int = SEED) -> tuple[np.ndarray, np.ndarray]:
+def training_pairs(
+    cases: list[str], n_per_case: int, *, seed: int = SEED
+) -> tuple[np.ndarray, np.ndarray]:
     """Normalised (low-dose, full-dose) patches, exactly as inference will normalise them."""
     rng = np.random.default_rng(seed)
     xs, ys = [], []
@@ -137,7 +170,7 @@ def training_pairs(cases: list[str], *, seed: int = SEED) -> tuple[np.ndarray, n
         n_slices, ny, nx = full.volume.shape
         taken = 0
         attempts = 0
-        while taken < N_PATCHES_PER_CASE and attempts < 40 * N_PATCHES_PER_CASE:
+        while taken < n_per_case and attempts < 40 * n_per_case:
             attempts += 1
             s = int(rng.integers(0, n_slices))
             r = int(rng.integers(0, ny - PATCH))
@@ -157,28 +190,43 @@ def training_pairs(cases: list[str], *, seed: int = SEED) -> tuple[np.ndarray, n
     return np.stack(xs).astype(np.float32), np.stack(ys).astype(np.float32)
 
 
-def train_network(x: np.ndarray, y: np.ndarray) -> Any:
+def train_network(
+    x: np.ndarray, y: np.ndarray, preset: dict[str, Any], device: str
+) -> tuple[Any, int, float]:
+    """Train, on the GPU if there is one, and hand the model back on the CPU.
+
+    Inference goes through ``denoiq_core.cnn.denoise_stack``, which feeds CPU tensors, so the
+    model comes home before it is used. One inference path for both capacities, and for
+    anyone re-running this without a GPU.
+    """
     torch.manual_seed(SEED)
-    model = build_cnn(DEFAULT_CNN, seed=SEED)
-    optimiser = torch.optim.Adam(model.parameters(), lr=LR)
+    model = build_cnn(preset["cnn"], seed=SEED).to(device)
+    n_parameters = sum(p.numel() for p in model.parameters())
+    optimiser = torch.optim.Adam(model.parameters(), lr=preset["lr"])
     loss_fn = torch.nn.MSELoss()
 
     n = x.shape[0]
     cut = int(0.85 * n)
-    xt = torch.from_numpy(x[:cut]).unsqueeze(1)
-    yt = torch.from_numpy(y[:cut]).unsqueeze(1)
-    xv = torch.from_numpy(x[cut:]).unsqueeze(1)
-    yv = torch.from_numpy(y[cut:]).unsqueeze(1)
-    print(f"\ntraining on {cut} patches, validating on {n - cut}")
+    xt = torch.from_numpy(x[:cut]).unsqueeze(1).to(device)
+    yt = torch.from_numpy(y[:cut]).unsqueeze(1).to(device)
+    xv = torch.from_numpy(x[cut:]).unsqueeze(1).to(device)
+    yv = torch.from_numpy(y[cut:]).unsqueeze(1).to(device)
+    batch, epochs = preset["batch"], preset["epochs"]
+    print(
+        f"\n{n_parameters} parameters on {device}; training on {cut} patches, "
+        f"validating on {n - cut}",
+        flush=True,
+    )
 
     generator = torch.Generator().manual_seed(SEED)
-    for epoch in range(EPOCHS):
+    best = float("inf")
+    for epoch in range(epochs):
         t0 = time.time()
         model.train()
-        order = torch.randperm(cut, generator=generator)
+        order = torch.randperm(cut, generator=generator).to(device)
         total = 0.0
-        for start in range(0, cut, BATCH):
-            index = order[start : start + BATCH]
+        for start in range(0, cut, batch):
+            index = order[start : start + batch]
             optimiser.zero_grad()
             loss = loss_fn(model(xt[index]), yt[index])
             loss.backward()
@@ -186,13 +234,23 @@ def train_network(x: np.ndarray, y: np.ndarray) -> Any:
             total += float(loss.detach()) * len(index)
         model.eval()
         with torch.no_grad():
-            validation = float(loss_fn(model(xv), yv))
-        print(
-            f"  epoch {epoch + 1:2d}/{EPOCHS}  train {total / cut:.5f}  "
-            f"val {validation:.5f}   ({time.time() - t0:.0f}s)",
-            flush=True,
-        )
-    return model
+            validation = float(
+                sum(
+                    float(loss_fn(model(xv[i : i + batch]), yv[i : i + batch]))
+                    * xv[i : i + batch].shape[0]
+                    for i in range(0, xv.shape[0], batch)
+                )
+                / xv.shape[0]
+            )
+        best = min(best, validation)
+        if epoch < 3 or (epoch + 1) % 5 == 0 or epoch == epochs - 1:
+            print(
+                f"  epoch {epoch + 1:3d}/{epochs}  train {total / cut:.5f}  "
+                f"val {validation:.5f}   ({time.time() - t0:.1f}s)",
+                flush=True,
+            )
+    print(f"  best validation loss {best:.5f}", flush=True)
+    return model.cpu(), n_parameters, best
 
 
 def gather_test() -> dict[str, Any]:
@@ -246,14 +304,31 @@ def gather_test() -> dict[str, Any]:
 
 
 def main() -> int:
-    print(f"train on {TRAIN_CASES}\ntest on  {TEST_CASES}\n")
-    x, y = training_pairs(TRAIN_CASES)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--preset", choices=sorted(PRESETS), default="small")
+    parser.add_argument("--device", default="auto", choices=("auto", "cpu", "cuda"))
+    args = parser.parse_args()
+    preset = PRESETS[args.preset]
+    device = (
+        ("cuda" if torch.cuda.is_available() else "cpu") if args.device == "auto" else args.device
+    )
+
+    print(f"preset {args.preset}: {preset['cnn']}")
+    print(f"train on {TRAIN_CASES}\ntest on  {TEST_CASES}\n", flush=True)
+    x, y = training_pairs(TRAIN_CASES, preset["patches"])
     print(f"\n{x.shape[0]} training patches of {PATCH}x{PATCH}, normalised as at inference")
-    model = train_network(x, y)
+    model, n_parameters, best_val = train_network(x, y, preset, device)
+    checkpoint = OUTDIR / f"liver_cnn_{args.preset}.pt"
     digest = save_checkpoint(
         model,
-        CHECKPOINT,
-        extra={"train_cases": TRAIN_CASES, "epochs": EPOCHS, "seed": SEED, "patch": PATCH},
+        checkpoint,
+        extra={
+            "train_cases": TRAIN_CASES,
+            "preset": args.preset,
+            "epochs": preset["epochs"],
+            "seed": SEED,
+            "patch": PATCH,
+        },
     )
     print(f"checkpoint sha256 {digest}")
 
@@ -275,7 +350,7 @@ def main() -> int:
         ("gaussian 1.00 mm", lambda a: denoise(a, method="gaussian", sigma=1.0 / spacing)),
         ("tv 1x noise", lambda a: denoise(a, method="tv", weight=NOISE_HU)),
         ("nlm 0.8x noise", lambda a: denoise(a, method="nlm", h=0.8 * NOISE_HU)),
-        ("CNN (trained here)", lambda a: denoise_stack(a, model)),
+        (f"CNN {args.preset} ({n_parameters / 1000:.0f}k)", lambda a: denoise_stack(a, model)),
     ]
 
     rows = []
@@ -313,7 +388,7 @@ def main() -> int:
         f"d' {best_psnr['d_prime'] / raw['d_prime']:.2f}x the unprocessed input"
     )
 
-    (OUTDIR / "liver_cnn.json").write_text(
+    (OUTDIR / f"liver_cnn_{args.preset}.json").write_text(
         json.dumps(
             {
                 "train": TRAIN_CASES,
@@ -345,7 +420,7 @@ def main() -> int:
     ax.legend(fontsize=9)
     ax.set_title(f"{n} held-out pairs, {len(data['used'])} liver cases the network never saw")
     fig.tight_layout()
-    out = OUTDIR / "liver_cnn.png"
+    out = OUTDIR / f"liver_cnn_{args.preset}.png"
     fig.savefig(out, dpi=130)
     print(f"\nwrote {out}")
     return 0
