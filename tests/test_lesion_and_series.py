@@ -10,8 +10,10 @@ from ldct_io import (
     ImageSeries,
     disk_lesion,
     homogeneous_sites,
+    make_paired_trials,
     make_trials,
     noise_only,
+    paired_d_prime,
 )
 
 
@@ -137,3 +139,59 @@ def test_an_impossible_dose_fraction_is_refused():
 def test_the_documented_dose_fractions_are_the_collection_s():
     assert SIMULATED_DOSE_FRACTION["CHEST"] == 0.10
     assert SIMULATED_DOSE_FRACTION["ABDOMEN"] == 0.25
+
+
+def test_paired_trials_share_a_background_and_differ_only_in_noise(fake_liver):
+    """The whole point of the BKE construction: anatomy cancels within the pair."""
+    vol, spacing = fake_liver
+    rng = np.random.default_rng(3)
+    noise = 25.0 * rng.standard_normal(vol.shape)
+    sites = homogeneous_sites(vol, spacing, 48)
+
+    trials = make_paired_trials(
+        vol, noise, spacing, sites, size=48, diameter_mm=8.0, contrast_hu=-25.0, seed=0
+    )
+    difference = trials.present - trials.absent
+    # present - absent = lesion + (noise_a - noise_b): the background is gone exactly, so the
+    # mean over trials is the lesion to within the standard error of two noise draws.
+    n = trials.meta["n_per_class"]
+    tolerance = 4.0 * np.sqrt(2.0) * 25.0 / np.sqrt(n)
+    assert difference.mean(axis=0) == pytest.approx(trials.signal, abs=tolerance)
+    # And the residual really is two noise draws, not one.
+    assert difference.std() == pytest.approx(np.sqrt(2.0) * 25.0, rel=0.15)
+
+
+def test_paired_trials_never_reuse_one_noise_patch_for_both_classes(fake_liver):
+    vol, spacing = fake_liver
+    rng = np.random.default_rng(4)
+    noise = 25.0 * rng.standard_normal(vol.shape)
+    sites = homogeneous_sites(vol, spacing, 48)
+    trials = make_paired_trials(vol, noise, spacing, sites, size=48, seed=1)
+    # If a trial drew the same patch twice, its difference would be exactly the lesion.
+    residual = (trials.present - trials.absent) - trials.signal[None]
+    assert residual.std(axis=(1, 2)).min() > 1.0
+
+
+def test_paired_d_prime_carries_the_root_two(fake_liver):
+    """Two independent noise draws make the paired difference sqrt(2) times as variable."""
+    rng = np.random.default_rng(5)
+    n = 20000
+    absent = rng.standard_normal(n)
+    present = rng.standard_normal(n) + 2.0
+    d = paired_d_prime(present, absent)
+    # Each score has unit noise, so the single-image d' is 2.0.
+    assert d == pytest.approx(2.0, rel=0.05)
+
+
+def test_paired_d_prime_refuses_degenerate_input():
+    with pytest.raises(ValueError, match="no spread"):
+        paired_d_prime(np.ones(10), np.zeros(10))
+    with pytest.raises(ValueError, match="equal numbers"):
+        paired_d_prime(np.ones(10), np.zeros(9))
+
+
+def test_paired_trials_refuse_a_mismatched_noise_volume(fake_liver):
+    vol, spacing = fake_liver
+    sites = homogeneous_sites(vol, spacing, 48)
+    with pytest.raises(ValueError, match="same volume"):
+        make_paired_trials(vol, np.zeros((2, 8, 8)), spacing, sites, size=48)

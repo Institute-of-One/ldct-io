@@ -40,7 +40,14 @@ from ldct_io.helical import (
     wfbp_from_series,
     wfbp_slice,
 )
-from ldct_io.lesion import LesionTrials, disk_lesion, homogeneous_sites, make_trials
+from ldct_io.lesion import (
+    LesionTrials,
+    disk_lesion,
+    homogeneous_sites,
+    make_paired_trials,
+    make_trials,
+    paired_d_prime,
+)
 from ldct_io.manifest import Manifest, SeriesRecord
 from ldct_io.phantoms import (
     disk_projection,
@@ -118,6 +125,8 @@ __all__ = [
     "disk_lesion",
     "homogeneous_sites",
     "make_trials",
+    "make_paired_trials",
+    "paired_d_prime",
     # provenance
     "Manifest",
     "SeriesRecord",
