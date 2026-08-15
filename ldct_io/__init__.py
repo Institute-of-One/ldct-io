@@ -14,6 +14,8 @@ What it does
 ``helical``     weighted 3-D backprojection, for objects that vary along z
 ``phantoms``    analytic sinograms — the closed-form answers the pipeline is held to
 ``edge``        MTF from a circular edge, with the biases of a binned ESF corrected
+``series``      reconstructed image series in HU — and why their dose tags lie
+``lesion``      hybrid lesions in real anatomy, so a task on patient data has ground truth
 ``manifest``    which series were used, under what licence
 
 The discipline is the one the companion packages use: every estimator is checked against a
@@ -38,6 +40,7 @@ from ldct_io.helical import (
     wfbp_from_series,
     wfbp_slice,
 )
+from ldct_io.lesion import LesionTrials, disk_lesion, homogeneous_sites, make_trials
 from ldct_io.manifest import Manifest, SeriesRecord
 from ldct_io.phantoms import (
     disk_projection,
@@ -56,6 +59,12 @@ from ldct_io.recon import (
     parker_weights,
     ramp_kernel,
     to_hu,
+)
+from ldct_io.series import (
+    SIMULATED_DOSE_FRACTION,
+    ImageSeries,
+    noise_only,
+    read_image_series,
 )
 
 __version__ = "0.1.0"
@@ -99,6 +108,16 @@ __all__ = [
     "RadialMTF",
     "fit_edge_circle",
     "radial_mtf",
+    # reconstructed image series
+    "ImageSeries",
+    "read_image_series",
+    "noise_only",
+    "SIMULATED_DOSE_FRACTION",
+    # hybrid lesions
+    "LesionTrials",
+    "disk_lesion",
+    "homogeneous_sites",
+    "make_trials",
     # provenance
     "Manifest",
     "SeriesRecord",
