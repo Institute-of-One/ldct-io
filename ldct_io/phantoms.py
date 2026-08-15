@@ -110,6 +110,68 @@ def disk_sinogram(
     )
 
 
+def ray_directions(geometry: ScanGeometry, angle: float) -> np.ndarray:
+    r"""Unit direction of every detector element's ray, ``(n_channels, n_rows, 3)``.
+
+    The detector is an arc centred on the focal spot, so every channel is the same distance
+    :math:`\mathrm{SDD}` from the source *measured in the fan plane*, and the rows are straight
+    lines parallel to the rotation axis. A ray to element :math:`(j, i)` therefore travels
+    :math:`\mathrm{SDD}` in the fan direction while rising :math:`(i - v_0)\,\Delta v` in z.
+    """
+    gamma = geometry.channel_angles()
+    # Central direction: from the source at angle beta towards the isocentre.
+    cx, cy = np.sin(angle), -np.cos(angle)
+    # Rotate it by the fan angle, in the same sense the channel index runs.
+    ux = cx * np.cos(gamma) - cy * np.sin(gamma)
+    uy = cx * np.sin(gamma) + cy * np.cos(gamma)
+
+    rows = (np.arange(geometry.n_rows) - geometry.central_row) * geometry.axial_spacing
+    d = np.empty((geometry.n_channels, geometry.n_rows, 3), dtype=np.float64)
+    d[:, :, 0] = (ux * geometry.source_to_detector)[:, None]
+    d[:, :, 1] = (uy * geometry.source_to_detector)[:, None]
+    d[:, :, 2] = rows[None, :]
+    return d / np.linalg.norm(d, axis=2, keepdims=True)
+
+
+def sphere_projection(
+    geometry: ScanGeometry,
+    source: np.ndarray,
+    angle: float,
+    radius: float,
+    attenuation: float,
+    *,
+    centre: tuple[float, float, float] = (0.0, 0.0, 0.0),
+) -> np.ndarray:
+    r"""Line integrals through a uniform sphere, one cone-beam view, ``(n_channels, n_rows)``.
+
+    A ray whose perpendicular distance from the centre is :math:`t` has path length
+    :math:`2\sqrt{a^2 - t^2}` inside a sphere of radius :math:`a` — exact for *any* ray, at any
+    cone angle, from any source position. That is what makes a sphere the right closed form for
+    a helical reconstruction: unlike a cylinder it varies along z, so it exercises everything a
+    cylinder cannot. The truth in the plane :math:`z_0` is a disk of radius
+    :math:`\sqrt{a^2 - (z_0 - z_c)^2}`.
+    """
+    if radius <= 0.0 or not np.isfinite(radius):
+        raise ValueError(f"radius must be finite and positive, got {radius!r}")
+    e = ray_directions(geometry, angle)
+    to_centre = np.asarray(centre, dtype=np.float64) - np.asarray(source, dtype=np.float64)
+    perpendicular = np.linalg.norm(np.cross(np.broadcast_to(to_centre, e.shape), e), axis=2)
+    inside = perpendicular < radius
+    out = np.zeros(perpendicular.shape, dtype=np.float64)
+    out[inside] = 2.0 * attenuation * np.sqrt(radius**2 - perpendicular[inside] ** 2)
+    return out
+
+
+def sphere_slice_truth(
+    radius: float, attenuation: float, z: float, centre_z: float = 0.0
+) -> tuple[float, float]:
+    """The plane ``z`` through a uniform sphere: ``(disk radius, attenuation)``."""
+    dz = abs(z - centre_z)
+    if dz >= radius:
+        return 0.0, 0.0
+    return float(np.sqrt(radius**2 - dz**2)), float(attenuation)
+
+
 def sampling_chain_mtf(
     geometry: ScanGeometry, frequency: np.ndarray, pixel_spacing: float
 ) -> np.ndarray:

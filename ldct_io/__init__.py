@@ -11,6 +11,7 @@ What it does
 ``dicomctpd``   read a projection series in *acquisition* order, not file-name order
 ``rebin``       helical acquisition -> the circular sinogram of one plane
 ``recon``       equiangular fan-beam FBP, on the CPU, checked against a closed form
+``helical``     weighted 3-D backprojection, for objects that vary along z
 ``phantoms``    analytic sinograms — the closed-form answers the pipeline is held to
 ``edge``        MTF from a circular edge, with the biases of a binned ESF corrected
 ``manifest``    which series were used, under what licence
@@ -30,8 +31,22 @@ from ldct_io.dicomctpd import (
 )
 from ldct_io.edge import CircleFit, RadialMTF, fit_edge_circle, radial_mtf
 from ldct_io.geometry import ScanGeometry, ViewTable
+from ldct_io.helical import (
+    Illumination,
+    illuminating_views,
+    row_window,
+    wfbp_from_series,
+    wfbp_slice,
+)
 from ldct_io.manifest import Manifest, SeriesRecord
-from ldct_io.phantoms import disk_projection, disk_sinogram, sampling_chain_mtf
+from ldct_io.phantoms import (
+    disk_projection,
+    disk_sinogram,
+    ray_directions,
+    sampling_chain_mtf,
+    sphere_projection,
+    sphere_slice_truth,
+)
 from ldct_io.rebin import SliceSinogram, single_slice_rebin
 from ldct_io.recon import (
     ReconResult,
@@ -66,9 +81,18 @@ __all__ = [
     "parker_weights",
     "ramp_kernel",
     "to_hu",
+    # helical, three-dimensional
+    "Illumination",
+    "illuminating_views",
+    "row_window",
+    "wfbp_slice",
+    "wfbp_from_series",
     # closed-form references
     "disk_projection",
     "disk_sinogram",
+    "ray_directions",
+    "sphere_projection",
+    "sphere_slice_truth",
     "sampling_chain_mtf",
     # measurement
     "CircleFit",
