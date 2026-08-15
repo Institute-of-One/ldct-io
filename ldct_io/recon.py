@@ -80,6 +80,11 @@ def ramp_kernel(n_channels: int, d_gamma: float) -> np.ndarray:
     return g
 
 
+def f_nyquist_fraction(cutoff: float) -> float:
+    """Where the apodisation window reaches zero, as a fraction of the DFT Nyquist (0.5)."""
+    return 0.5 * float(cutoff)
+
+
 def parker_weights(geometry: ScanGeometry, angles: np.ndarray) -> np.ndarray:
     r"""Parker weights for a short scan, ``(n_views, n_channels)``.
 
@@ -125,7 +130,11 @@ def parker_weights(geometry: ScanGeometry, angles: np.ndarray) -> np.ndarray:
 
 
 def filter_projections(
-    sinogram: np.ndarray, geometry: ScanGeometry, *, apodisation: str = "none"
+    sinogram: np.ndarray,
+    geometry: ScanGeometry,
+    *,
+    apodisation: str = "none",
+    cutoff: float = 1.0,
 ) -> np.ndarray:
     """Cosine-weight and ramp-filter a fan-beam sinogram.
 
@@ -138,8 +147,12 @@ def filter_projections(
     apodisation:
         ``"none"`` (default) is the bare ramp — the sharpest reconstruction the sampling
         allows, and the one whose transfer function is known exactly. ``"hann"`` applies a
-        Hann window, which is what a clinical "smooth" kernel resembles; use it when the point
-        is to mimic a vendor kernel, not when the point is to measure the system.
+        Hann window, which is what a clinical "smooth" kernel resembles.
+    cutoff:
+        Fraction of the sampling Nyquist at which the window reaches zero, for
+        ``apodisation="hann"``. Lowering it is a real sweep of the reconstruction: MTF and NPS
+        move together, exactly as they do when a scanner's kernel is changed, and nothing
+        about the acquisition is simulated. Ignored when ``apodisation="none"``.
 
     """
     sino = np.asarray(sinogram, dtype=np.float64)
@@ -159,8 +172,11 @@ def filter_projections(
     n_fft = 1 << int(np.ceil(np.log2(geometry.n_channels + g.size)))
     kernel = np.fft.rfft(g, n_fft)
     if apodisation == "hann":
-        f = np.fft.rfftfreq(n_fft)
-        kernel = kernel * (0.5 + 0.5 * np.cos(np.pi * f / f.max()))
+        if not 0.0 < cutoff <= 1.0:
+            raise ValueError(f"cutoff must be in (0, 1], got {cutoff}")
+        f = np.fft.rfftfreq(n_fft) / f_nyquist_fraction(cutoff)
+        window = np.where(f <= 1.0, 0.5 + 0.5 * np.cos(np.pi * np.clip(f, 0.0, 1.0)), 0.0)
+        kernel = kernel * window
     elif apodisation != "none":
         raise ValueError(f"unknown apodisation {apodisation!r}; use 'none' or 'hann'")
 
@@ -242,6 +258,7 @@ def fan_beam_fbp(
     fov: float = 260.0,
     n_pixels: int = 512,
     apodisation: str = "none",
+    cutoff: float = 1.0,
     source_radius: np.ndarray | float | None = None,
     short_scan: bool = False,
 ) -> ReconResult:
@@ -257,8 +274,9 @@ def fan_beam_fbp(
         Source angle of every view [rad].
     fov, n_pixels:
         Field of view [mm] and grid size.
-    apodisation:
-        Passed to :func:`filter_projections`.
+    apodisation, cutoff:
+        Passed to :func:`filter_projections`. Sweeping ``cutoff`` sweeps the reconstruction's
+        own transfer function on unchanged acquisition data.
     source_radius:
         Per-view source-to-isocentre distance, if the focal spot is displaced radially.
     short_scan:
@@ -283,7 +301,7 @@ def fan_beam_fbp(
     if short_scan:
         sinogram = sinogram * parker_weights(geometry, angles)
 
-    filtered = filter_projections(sinogram, geometry, apodisation=apodisation)
+    filtered = filter_projections(sinogram, geometry, apodisation=apodisation, cutoff=cutoff)
     image = backproject(
         filtered, geometry, angles, fov=fov, n_pixels=n_pixels, source_radius=source_radius
     )
@@ -304,6 +322,7 @@ def fan_beam_fbp(
             "n_views": int(angles.size),
             "angular_coverage_deg": float(np.degrees(covered + step)),
             "apodisation": apodisation,
+            "cutoff": cutoff if apodisation != "none" else None,
             "short_scan": short_scan,
             "filter": "equiangular ramp (Kak & Slaney 3.4)",
             "interpolation": "linear in the channel direction",
