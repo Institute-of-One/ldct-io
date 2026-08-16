@@ -12,7 +12,10 @@
     "neq_integral": 0.0002793070143370836,
     "d_ideal": 1.86761962901725,
     "d_npwe": 0.6210950795401087,
-    "efficiency": 0.11059597400749888
+    "efficiency": 0.11059597400749888,
+    "parseval_residual": 4.440892098500626e-16,
+    "nps_dynamic_range": 3054.2210196657593,
+    "signal_area_residual": 0.004704434454867679
   },
   {
     "label": "hann 1.00",
@@ -27,7 +30,10 @@
     "neq_integral": 0.00024386088131563783,
     "d_ideal": 1.934936354354647,
     "d_npwe": 0.7608746788562073,
-    "efficiency": 0.15462969317515893
+    "efficiency": 0.15462969317515893,
+    "parseval_residual": 2.220446049250313e-16,
+    "nps_dynamic_range": 15835.190222024647,
+    "signal_area_residual": 0.004704434454867679
   },
   {
     "label": "hann 0.80",
@@ -42,7 +48,10 @@
     "neq_integral": 0.00024539435875916513,
     "d_ideal": 1.9791315249962989,
     "d_npwe": 0.8264822523474851,
-    "efficiency": 0.17438846340113567
+    "efficiency": 0.17438846340113567,
+    "parseval_residual": 4.440892098500626e-16,
+    "nps_dynamic_range": 28951.605750089067,
+    "signal_area_residual": 0.004704434454867679
   },
   {
     "label": "hann 0.60",
@@ -57,7 +66,10 @@
     "neq_integral": 0.0002583484286269808,
     "d_ideal": 2.077684325865754,
     "d_npwe": 0.9398966546369872,
-    "efficiency": 0.20464497292756909
+    "efficiency": 0.20464497292756909,
+    "parseval_residual": 4.440892098500626e-16,
+    "nps_dynamic_range": 103614.0927552695,
+    "signal_area_residual": 0.004704434454867679
   },
   {
     "label": "hann 0.45",
@@ -72,7 +84,10 @@
     "neq_integral": 0.0002572315027899861,
     "d_ideal": 2.1494011325195297,
     "d_npwe": 1.037850827560195,
-    "efficiency": 0.23314973446499837
+    "efficiency": 0.23314973446499837,
+    "parseval_residual": 2.220446049250313e-16,
+    "nps_dynamic_range": 289667.4013235555,
+    "signal_area_residual": 0.004704434454867679
   },
   {
     "label": "hann 0.35",
@@ -87,7 +102,10 @@
     "neq_integral": 0.00020343204499790698,
     "d_ideal": 2.252202736176575,
     "d_npwe": 1.1605959638573158,
-    "efficiency": 0.2655505151781119
+    "efficiency": 0.2655505151781119,
+    "parseval_residual": 2.220446049250313e-16,
+    "nps_dynamic_range": 660637.1224046606,
+    "signal_area_residual": 0.004704434454867679
   },
   {
     "label": "hann 0.25",
@@ -102,6 +120,9 @@
     "neq_integral": 0.00012276595496869957,
     "d_ideal": 2.5720730430841208,
     "d_npwe": 1.4797333542098217,
-    "efficiency": 0.33097891727378836
+    "efficiency": 0.33097891727378836,
+    "parseval_residual": 4.440892098500626e-16,
+    "nps_dynamic_range": 993857.7528478546,
+    "signal_area_residual": 0.004704434454867679
   }
 ]

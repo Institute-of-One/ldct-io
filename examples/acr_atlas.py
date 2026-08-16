@@ -122,6 +122,19 @@ def blurred_disk(size, spacing, diameter_mm, contrast, freq, mtf):
     return np.real(np.fft.ifft2(np.fft.fft2(ideal) * transfer)), X, Y
 
 
+def _dynamic_range_excluding_dc(plane: np.ndarray) -> float:
+    """max/min of a centred NPS plane, with DC removed.
+
+    Mean- or polynomial-detrending drives the DC bin to ~1e-31 by construction. That
+    is bookkeeping, not a decayed spectrum, and reading it as one makes the check fire
+    on every field including white noise.
+    """
+    q = np.asarray(plane, dtype=float).copy()
+    q[q.shape[0] // 2, q.shape[1] // 2] = np.nan
+    positive = q[np.isfinite(q) & (q > 0)]
+    return float(np.nanmax(q) / positive.min()) if positive.size else float("inf")
+
+
 def main() -> int:
     series = index_series(DATA)
     g = series.geometry
@@ -176,6 +189,20 @@ def main() -> int:
                 d_ideal=float(d_ideal),
                 d_npwe=float(d_npwe),
                 efficiency=float((d_npwe / d_ideal) ** 2),
+                # The internal identities, evaluated on measured data. These need no
+                # ground truth, which is the whole reason they can be run here at all:
+                # the true MTF and NPS of a clinical scanner are not known in closed form.
+                parseval_residual=float(abs(nps.integral / nps.variance - 1.0)),
+                nps_dynamic_range=_dynamic_range_excluding_dc(nps.nps),
+                signal_area_residual=float(
+                    abs(
+                        signal.sum()
+                        * sp
+                        * sp
+                        / (LESION_CONTRAST_HU * np.pi * (LESION_DIAMETER_MM / 2.0) ** 2)
+                        - 1.0
+                    )
+                ),
             )
         )
         curves[label] = (
@@ -189,7 +216,10 @@ def main() -> int:
         print(
             f"  {label:11s} MTF50 {mtf.mtf50:.3f}  f_max {f_max:.3f}  "
             f"noise {np.sqrt(nps.integral):6.1f} HU  NEQ_int {neq_res.integral:.3e}  "
-            f"d'_ideal {d_ideal:6.3f}  d'_NPWE {d_npwe:6.3f}  ({time.time() - t0:.0f}s)",
+            f"d'_ideal {d_ideal:6.3f}  d'_NPWE {d_npwe:6.3f}  "
+            f"| Parseval {rows[-1]['parseval_residual']:.1e}  "
+            f"NPS range {rows[-1]['nps_dynamic_range']:.1e}  "
+            f"area {rows[-1]['signal_area_residual']:.1e}  ({time.time() - t0:.0f}s)",
             flush=True,
         )
 
