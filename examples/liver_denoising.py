@@ -13,6 +13,7 @@ which is what gives the task a ground truth at all.
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -40,10 +41,8 @@ from ldct_io import SIMULATED_DOSE_FRACTION, homogeneous_sites, make_trials, rea
 CONFIG = DEFAULT_CONFIG
 
 ROOT = Path(r"D:\DevData\TCIA\LDCT-and-Projection-data")
-OUTDIR = Path(
-    r"C:\Users\YAMAMO~1\AppData\Local\Temp\claude\D--DevGit-DICOM-Viewer"
-    r"\4b28a974-1910-45c1-aa13-1fed27b3f70c\scratchpad"
-)
+OUTDIR = Path(os.environ.get("LDCT_IO_OUT") or Path(__file__).resolve().parents[1] / "results")
+OUTDIR.mkdir(parents=True, exist_ok=True)
 CASES = sorted(p.name for p in ROOT.glob("L0*")) + sorted(p.name for p in ROOT.glob("L1*"))
 ROI = 48
 MAX_PER_CASE = 250  # so a few large livers do not become the whole study

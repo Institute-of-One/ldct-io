@@ -32,3 +32,7 @@ Thumbs.db
 
 # The per-series index is a cache of the archive directory, rebuilt in one pass.
 ldct_io_index.json
+
+# trained checkpoints and intermediate arrays: regenerate, do not track
+results/*.pt
+results/*.npz

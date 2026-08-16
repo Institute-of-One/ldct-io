@@ -19,6 +19,7 @@ cross-fitted, and can only be compared with that closed form.
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -41,10 +42,8 @@ from ldct_io import (
 )
 
 ROOT = Path(r"D:\DevData\TCIA\LDCT-and-Projection-data")
-OUTDIR = Path(
-    r"C:\Users\YAMAMO~1\AppData\Local\Temp\claude\D--DevGit-DICOM-Viewer"
-    r"\4b28a974-1910-45c1-aa13-1fed27b3f70c\scratchpad"
-)
+OUTDIR = Path(os.environ.get("LDCT_IO_OUT") or Path(__file__).resolve().parents[1] / "results")
+OUTDIR.mkdir(parents=True, exist_ok=True)
 CASES = sorted(p.name for p in ROOT.glob("L0*"))
 ROI, MAX_PER_CASE = 48, 250
 LESION_MM, LESION_HU, LESION_EDGE_SIGMA_MM = 8.0, -25.0, 0.5

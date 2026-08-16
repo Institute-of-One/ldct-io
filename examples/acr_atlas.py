@@ -12,6 +12,7 @@ from taskiq_core with no modification.
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -32,10 +33,8 @@ from ldct_io import (
 )
 
 DATA = Path(r"D:\DevData\TCIA\LDCT-and-Projection-data\ACR_Phantom\projections")
-OUTDIR = Path(
-    r"C:\Users\YAMAMO~1\AppData\Local\Temp\claude\D--DevGit-DICOM-Viewer"
-    r"\4b28a974-1910-45c1-aa13-1fed27b3f70c\scratchpad"
-)
+OUTDIR = Path(os.environ.get("LDCT_IO_OUT") or Path(__file__).resolve().parents[1] / "results")
+OUTDIR.mkdir(parents=True, exist_ok=True)
 Z, FOV, NPIX = -168.0, 260.0, 512
 ROI = 64
 # The ACR low-contrast module's own task: a 6 HU cylinder. 5 mm across.

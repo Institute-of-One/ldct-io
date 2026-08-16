@@ -60,6 +60,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -92,10 +93,8 @@ from ldct_io import (
 )
 
 ROOT = Path(r"D:\DevData\TCIA\LDCT-and-Projection-data")
-OUTDIR = Path(
-    r"C:\Users\YAMAMO~1\AppData\Local\Temp\claude\D--DevGit-DICOM-Viewer"
-    r"\4b28a974-1910-45c1-aa13-1fed27b3f70c\scratchpad"
-)
+OUTDIR = Path(os.environ.get("LDCT_IO_OUT") or Path(__file__).resolve().parents[1] / "results")
+OUTDIR.mkdir(parents=True, exist_ok=True)
 ALL_CASES = sorted(p.name for p in ROOT.glob("L0*"))
 TRAIN_CASES, TEST_CASES = ALL_CASES[:8], ALL_CASES[8:]
 
