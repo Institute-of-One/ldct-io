@@ -232,7 +232,8 @@ def main() -> int:
 
     (OUTDIR / "acr_atlas.json").write_text(json.dumps(rows, indent=2))
 
-    fig, axes = plt.subplots(1, 4, figsize=(19, 4.4))
+    fig, axgrid = plt.subplots(2, 2, figsize=(11, 8.6))
+    axes = axgrid.ravel()
     for label, (f, m, nf, npsr, qf, q) in curves.items():
         axes[0].plot(f, m, lw=1.3, label=label)
         axes[1].plot(nf, npsr, lw=1.3)
@@ -241,7 +242,7 @@ def main() -> int:
     axes[0].set_ylabel("MTF")
     axes[0].set_xlim(0, 1)
     axes[0].set_ylim(0, 1.05)
-    axes[0].legend(fontsize=7)
+    axes[0].legend(fontsize=9)
     axes[0].grid(alpha=0.3)
     axes[0].set_title("measured MTF (ACR outer edge)")
     axes[1].set_xlabel("cycles/mm")
@@ -269,7 +270,7 @@ def main() -> int:
         axes[3].annotate(
             f"{r['label']}\n{r['noise_sd']:.0f} HU",
             (x, y),
-            fontsize=6,
+            fontsize=8,
             textcoords="offset points",
             xytext=(3, -12),
         )
@@ -277,7 +278,7 @@ def main() -> int:
     axes[3].set_ylabel(r"$d'$")
     axes[3].set_ylim(0, None)
     axes[3].grid(alpha=0.3)
-    axes[3].legend(fontsize=8)
+    axes[3].legend(fontsize=9)
     axes[3].set_title(
         f"{LESION_DIAMETER_MM:.0f} mm / {LESION_CONTRAST_HU:.0f} HU lesion: "
         "the same filter, two observers"
