@@ -232,7 +232,8 @@ def main() -> int:
 
     (OUTDIR / "acr_atlas.json").write_text(json.dumps(rows, indent=2))
 
-    fig, axgrid = plt.subplots(2, 2, figsize=(11, 8.6))
+    plt.rcParams.update({"font.size": 11, "axes.titlesize": 12, "figure.dpi": 300})
+    fig, axgrid = plt.subplots(2, 2, figsize=(7.8, 6.8))
     axes = axgrid.ravel()
     for label, (f, m, nf, npsr, qf, q) in curves.items():
         axes[0].plot(f, m, lw=1.3, label=label)
@@ -242,7 +243,7 @@ def main() -> int:
     axes[0].set_ylabel("MTF")
     axes[0].set_xlim(0, 1)
     axes[0].set_ylim(0, 1.05)
-    axes[0].legend(fontsize=9)
+    axes[0].legend(fontsize=9.5)
     axes[0].grid(alpha=0.3)
     axes[0].set_title("measured MTF (ACR outer edge)")
     axes[1].set_xlabel("cycles/mm")
@@ -266,19 +267,29 @@ def main() -> int:
     axes[3].plot(mtf50, d_i, "o-", label="ideal (prewhitening)")
     axes[3].plot(mtf50, d_n, "s-", label="NPWE + eye filter")
     axes[3].plot(mtf50[intact], d_i[intact], "o", ms=11, mfc="none", mec="C0", label="band intact")
-    for r, x, y in zip(rows, mtf50, d_n, strict=True):
+    # Only the two ends are labelled. At a type size that survives reduction to a text
+    # column, seven annotations collide with each other and with the legend; the ends
+    # carry the range, and Table 2 of the manuscript carries all seven exactly.
+    # rows[0] is the ramp, which is the *rightmost* point (highest MTF50), and the
+    # last row is hann 0.25 at the left. Each label is pushed away from its own edge.
+    ends = ((0, -8, -14, "right", "top"), (len(rows) - 1, 9, 10, "left", "bottom"))
+    for idx, dx, dy, ha, va in ends:
+        r = rows[idx]
         axes[3].annotate(
-            f"{r['label']}\n{r['noise_sd']:.0f} HU",
-            (x, y),
-            fontsize=8,
+            f"{r['label']}, {r['noise_sd']:.0f} HU",
+            (mtf50[idx], d_n[idx]),
+            fontsize=9.5,
             textcoords="offset points",
-            xytext=(3, -12),
+            xytext=(dx, dy),
+            ha=ha,
+            va=va,
         )
     axes[3].set_xlabel("MTF50 [cycles/mm]  ← smoother kernel")
     axes[3].set_ylabel(r"$d'$")
     axes[3].set_ylim(0, None)
+    axes[3].margins(x=0.10)
     axes[3].grid(alpha=0.3)
-    axes[3].legend(fontsize=9)
+    axes[3].legend(fontsize=9.5, loc="lower left", framealpha=0.95)
     axes[3].set_title(
         f"{LESION_DIAMETER_MM:.0f} mm / {LESION_CONTRAST_HU:.0f} HU lesion: "
         "the same filter, two observers"
