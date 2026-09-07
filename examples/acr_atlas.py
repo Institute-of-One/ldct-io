@@ -32,7 +32,10 @@ from ldct_io import (
     to_hu,
 )
 
-DATA = Path(r"D:\DevData\TCIA\LDCT-and-Projection-data\ACR_Phantom\projections")
+DATA = Path(
+    os.environ.get("LDCT_IO_DATA")
+    or r"D:\DevData\TCIA\LDCT-and-Projection-data\ACR_Phantom\projections"
+)
 OUTDIR = Path(os.environ.get("LDCT_IO_OUT") or Path(__file__).resolve().parents[1] / "results")
 OUTDIR.mkdir(parents=True, exist_ok=True)
 Z, FOV, NPIX = -168.0, 260.0, 512

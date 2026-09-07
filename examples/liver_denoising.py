@@ -40,7 +40,7 @@ from ldct_io import SIMULATED_DOSE_FRACTION, homogeneous_sites, make_trials, rea
 # not a smaller window: MAX_PER_CASE is what governs it.
 CONFIG = DEFAULT_CONFIG
 
-ROOT = Path(r"D:\DevData\TCIA\LDCT-and-Projection-data")
+ROOT = Path(os.environ.get("LDCT_IO_DATA") or r"D:\DevData\TCIA\LDCT-and-Projection-data")
 OUTDIR = Path(os.environ.get("LDCT_IO_OUT") or Path(__file__).resolve().parents[1] / "results")
 OUTDIR.mkdir(parents=True, exist_ok=True)
 CASES = sorted(p.name for p in ROOT.glob("L0*")) + sorted(p.name for p in ROOT.glob("L1*"))

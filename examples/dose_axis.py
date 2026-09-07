@@ -68,7 +68,7 @@ from ldct_io import (
     read_image_series,
 )
 
-ROOT = Path(r"D:\DevData\TCIA\LDCT-and-Projection-data")
+ROOT = Path(os.environ.get("LDCT_IO_DATA") or r"D:\DevData\TCIA\LDCT-and-Projection-data")
 OUTDIR = Path(os.environ.get("LDCT_IO_OUT") or Path(__file__).resolve().parents[1] / "results")
 OUTDIR.mkdir(parents=True, exist_ok=True)
 ROI, MAX_PER_CASE, SEED, N_FOLDS = 48, 250, 0, 5

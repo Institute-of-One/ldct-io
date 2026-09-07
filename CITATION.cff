@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software or its results, please cite it using this metadata."
+title: "ldct-io: read, reconstruct and measure real CT projection data (DICOM-CT-PD)"
+type: software
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/Institute-of-One/ldct-io"
+abstract: >-
+  Reads DICOM-CT-PD projection data as distributed by The Cancer Imaging Archive, restores
+  acquisition order from headers rather than filenames, rebins helical fan-beam projections
+  to single slices, reconstructs them by filtered backprojection with a selectable
+  apodisation, and measures the physical quantities that task-based image quality is built
+  on. It exists so that a measurement made on a real scanner can be re-derived from the
+  archived projections rather than taken on trust.
+authors:
+  - family-names: Yamamoto
+    given-names: Shuji
+    orcid: "https://orcid.org/0000-0001-9211-1071"
+    affiliation: "Institute of One, LISIT Co., Ltd., Tokyo 150-0044, Japan"
+keywords:
+  - computed tomography
+  - DICOM-CT-PD
+  - projection data
+  - filtered backprojection
+  - single-slice rebinning
+  - modulation transfer function
+  - noise power spectrum
+  - reproducible research

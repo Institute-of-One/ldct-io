@@ -16,6 +16,31 @@ change to meet real data.
 
 ---
 
+## Reproducing the real-scanner arm of a published measurement
+
+`examples/acr_atlas.py` produces the ACR-phantom atlas — MTF, NPS, NEQ and two model
+observers across seven reconstruction kernels — that forms the real-scanner arm of
+
+> Yamamoto S. *Error Injection in Task-Based Image Quality Pipelines: What Regression
+> Testing Cannot Catch, and Why Neither Internal Identities nor Closed-Form References
+> Suffice Alone.* Submitted to *Journal of Imaging*.
+
+**Neither package reproduces it alone.** The reconstruction, the archive reading and the
+edge measurement are here; the NPS, NEQ and observer estimators are in `taskiq-core`. The
+manuscript's data-availability statement cites both for that reason.
+
+```bash
+pip install -e .            # and taskiq-core, in the same environment
+export LDCT_IO_DATA=/path/to/LDCT-and-Projection-data/ACR_Phantom/projections
+python examples/acr_atlas.py
+```
+
+The projections are the ACR_Phantom series of *LDCT-and-Projection-data* at The Cancer
+Imaging Archive, CC BY 4.0. They are not redistributed here: `LDCT_IO_DATA` points at your
+own copy, and `results/acr_atlas.json` records what the run produced.
+
+---
+
 ## The one idea, carried over
 
 **Every estimator is validated against a closed-form answer, not against itself.**
@@ -98,7 +123,7 @@ print(len(series), series.views.views_per_rotation, series.views.pitch(series.ge
 # 18032  2304.1  0.7985
 
 sino = single_slice_rebin(series, z=-170.0, focal_spot_class=0)
-print(sino.drift_at_radius(100.0))          # how far the rays wander in z out there
+print(sino.drift_at_radius(100.0))  # how far the rays wander in z out there
 
 recon = fan_beam_fbp(sino.sinogram, series.geometry, sino.angles, fov=260.0, n_pixels=512)
 hu = to_hu(recon.image, series.geometry.water_attenuation)
