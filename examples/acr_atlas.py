@@ -320,6 +320,20 @@ def main() -> int:
     )
     fig.tight_layout()
     out = OUTDIR / "acr_atlas.png"
+    # Panel labels, requested at review. Axes coordinates, so they stay put
+    # when the data range changes.
+    for ax, letter in zip(fig.axes, ["(a)", "(b)", "(c)", "(d)"], strict=False):
+        ax.text(
+            -0.16,
+            1.10,
+            letter,
+            transform=ax.transAxes,
+            fontsize=13,
+            fontweight="bold",
+            va="bottom",
+            ha="left",
+        )
+
     fig.savefig(out, dpi=120, bbox_inches="tight")
     print(f"\nwrote {out}")
     return 0
