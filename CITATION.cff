@@ -3,6 +3,7 @@ message: "If you use this software or its results, please cite it using this met
 title: "ldct-io: read, reconstruct and measure real CT projection data (DICOM-CT-PD)"
 type: software
 version: 0.1.0
+date-released: "2026-09-12"
 license: MIT
 repository-code: "https://github.com/Institute-of-One/ldct-io"
 abstract: >-
