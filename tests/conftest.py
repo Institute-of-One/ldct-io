@@ -13,7 +13,8 @@ from pydicom.uid import ExplicitVRLittleEndian
 
 from ldct_io.geometry import ScanGeometry
 
-# Values read from a real LDCT-and-Projection-data series (a Siemens scanner; the headers name no model).
+# Values read from a real LDCT-and-Projection-data series (a Siemens scanner; the
+# headers name no model).
 FLASH = dict(
     source_to_isocentre=595.0,
     source_to_detector=1085.5999755859375,

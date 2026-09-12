@@ -320,8 +320,7 @@ def main() -> int:
         # The model is not in the DICOM headers, which carry Manufacturer "SIEMENS" and
         # nothing more, and the dataset paper does not name it either. Say what the data
         # says.
-        "Real scanner (Siemens), ACR phantom — "
-        "reconstruction kernel swept, nothing simulated",
+        "Real scanner (Siemens), ACR phantom — reconstruction kernel swept, nothing simulated",
         y=1.02,
     )
     fig.tight_layout()
