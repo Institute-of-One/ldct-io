@@ -289,10 +289,13 @@ def main() -> int:
         )
     axes[3].set_xlabel("MTF50 [cycles/mm]  ← smoother kernel")
     axes[3].set_ylabel(r"$d'$")
-    axes[3].set_ylim(0, None)
+    # Headroom above the ideal curve, so the legend has a corner of its own. With the
+    # legend in the lower left it sat in the same empty band as the two end labels, and
+    # the copy-editor of the J. Imaging proof asked whether the crowding cost anything.
+    axes[3].set_ylim(0, float(max(d_i)) * 1.35)
     axes[3].margins(x=0.10)
     axes[3].grid(alpha=0.3)
-    axes[3].legend(fontsize=9.5, loc="lower left", framealpha=0.95)
+    axes[3].legend(fontsize=9.5, loc="upper right", framealpha=0.95)
     axes[3].set_title(
         f"{LESION_DIAMETER_MM:.0f} mm / {LESION_CONTRAST_HU:.0f} HU lesion: "
         "the same filter, two observers"
@@ -314,7 +317,10 @@ def main() -> int:
         f"({d_n[intact].max() / d_n[intact].min():.2f}x)"
     )
     fig.suptitle(
-        "Real scanner (Siemens Definition Flash), ACR phantom — "
+        # The model is not in the DICOM headers, which carry Manufacturer "SIEMENS" and
+        # nothing more, and the dataset paper does not name it either. Say what the data
+        # says.
+        "Real scanner (Siemens), ACR phantom — "
         "reconstruction kernel swept, nothing simulated",
         y=1.02,
     )
