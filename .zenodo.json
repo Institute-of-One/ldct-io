@@ -42,6 +42,12 @@
       "relation": "isVersionOf",
       "resource_type": "software",
       "scheme": "doi"
+    },
+    {
+      "identifier": "10.3390/jimaging12090443",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-article",
+      "scheme": "doi"
     }
   ],
   "notes": "The real-scanner arm of the taskiq-core manuscript is produced by examples/acr_atlas.py in this repository together with taskiq-core; neither package alone reproduces it. Record the concept DOI as an isVersionOf relation once minted, and never as a top-level 'doi', which would tell Zenodo the DOI was assigned elsewhere and stop it versioning releases."
