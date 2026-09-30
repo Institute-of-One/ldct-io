@@ -1,0 +1,81 @@
+{
+  "what": "adversarial weight sweep: where the generator starts making texture",
+  "cases": [
+    "L004",
+    "L006",
+    "L014",
+    "L019"
+  ],
+  "n_patches": 1600,
+  "n_eval_patches": 240,
+  "epochs": 30,
+  "mse_weight": 0.05,
+  "preset": "small",
+  "seed": 0,
+  "device": "cuda",
+  "unprocessed": {
+    "texture_ratio": 1.18890862334049,
+    "output_detail_sd": 3.0627811477539413,
+    "target_detail_sd": 2.5761282975208055,
+    "registration": 0.9848120990277779,
+    "rmse": 2.6112074369766587
+  },
+  "rows": [
+    {
+      "adv_weight": 0.0,
+      "mse_weight": 0.05,
+      "critic_lr": 0.001,
+      "best_val_mse": 3.1103731791178384,
+      "final_val_mse": 3.1135543823242187,
+      "generator_sha256": "8ce15ac8063f52184d3e2daeeb346c27c2de21f5349e41bdd04e63731857b1ed",
+      "seconds": 21.5,
+      "texture_ratio": 0.8997407574230334,
+      "output_detail_sd": 2.317847625630279,
+      "target_detail_sd": 2.5761282975208055,
+      "registration": 0.9927010013005462,
+      "rmse": 1.7645266965919775
+    },
+    {
+      "adv_weight": 1.0,
+      "mse_weight": 0.05,
+      "critic_lr": 0.001,
+      "best_val_mse": 3.5257510503133136,
+      "final_val_mse": 3.7045392354329425,
+      "generator_sha256": "8d0b301eda687beabe93994b5dcc9a7cf2c480dc9feff4ce52afa4492955de0c",
+      "seconds": 19.2,
+      "texture_ratio": 0.9694257887057145,
+      "output_detail_sd": 2.4973652066312164,
+      "target_detail_sd": 2.5761282975208055,
+      "registration": 0.9913125826942557,
+      "rmse": 1.9247180230174281
+    },
+    {
+      "adv_weight": 5.0,
+      "mse_weight": 0.05,
+      "critic_lr": 0.001,
+      "best_val_mse": 3.636918131510417,
+      "final_val_mse": 3.636918131510417,
+      "generator_sha256": "d1deaef48ef97094d5743a41512adbd4d285d3acfc39177181d7d5e384f5ac56",
+      "seconds": 19.3,
+      "texture_ratio": 0.9530455948278448,
+      "output_detail_sd": 2.4551677256635593,
+      "target_detail_sd": 2.5761282975208055,
+      "registration": 0.9915993383813704,
+      "rmse": 1.907070557818467
+    },
+    {
+      "adv_weight": 20.0,
+      "mse_weight": 0.05,
+      "critic_lr": 0.001,
+      "best_val_mse": 3.6087342262268067,
+      "final_val_mse": 3.8447915077209474,
+      "generator_sha256": "0559c05de9f158751f1cc906d8a4892260d13611f3978065e947e4115b64edd5",
+      "seconds": 18.7,
+      "texture_ratio": 0.9661058678784209,
+      "output_detail_sd": 2.488812664642497,
+      "target_detail_sd": 2.5761282975208055,
+      "registration": 0.9911363930962516,
+      "rmse": 1.9608139914920095
+    }
+  ]
+}
