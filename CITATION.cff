@@ -9,7 +9,7 @@ repository-code: "https://github.com/Institute-of-One/ldct-io"
 doi: "10.5281/zenodo.22723943"
 identifiers:
   - type: doi
-    value: "10.5281/zenodo.22723944"
+    value: "10.5281/zenodo.23095235"
     description: >-
       The archived version 0.1.0, the release behind the real-scanner arm of the J. Imaging
       manuscript jimaging-4539482. Cite this one to pin the code; the DOI above always
