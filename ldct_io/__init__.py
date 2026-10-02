@@ -40,6 +40,11 @@ from ldct_io.helical import (
     wfbp_from_series,
     wfbp_slice,
 )
+from ldct_io.dose import (
+    calibrate_incident_counts,
+    insert_quantum_noise,
+    noise_scale_factor,
+)
 from ldct_io.lesion import (
     LesionTrials,
     disk_lesion,
@@ -120,6 +125,9 @@ __all__ = [
     "read_image_series",
     "noise_only",
     "SIMULATED_DOSE_FRACTION",
+    "insert_quantum_noise",
+    "noise_scale_factor",
+    "calibrate_incident_counts",
     # hybrid lesions
     "LesionTrials",
     "disk_lesion",

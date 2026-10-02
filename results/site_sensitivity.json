@@ -1,0 +1,220 @@
+{
+  "rules": {
+    "as published": {
+      "rule": {
+        "hu_range": [
+          0.0,
+          160.0
+        ],
+        "max_sd": 60.0,
+        "max_gradient": 40.0,
+        "structure_sd": null
+      },
+      "cases": {
+        "L058": 250,
+        "L064": 229,
+        "L071": 250,
+        "L072": 24
+      },
+      "n_pairs": 753,
+      "ceiling": 8.087041352580298,
+      "structure_sd_median": 15.370526900591592,
+      "structure_sd_p90": 38.014280131576314,
+      "structure_over_lesion_fraction": 0.30677290836653387,
+      "lesion_depth_hu": 25.0,
+      "rows": [
+        {
+          "label": "unprocessed",
+          "d_prime": 5.293961106972725,
+          "ratio": 0.654622732364736,
+          "psnr": 22.507812678435023,
+          "ceiling": 8.087041352580298
+        },
+        {
+          "label": "gaussian 0.75 mm",
+          "d_prime": 4.178671652390929,
+          "ratio": 0.5167120421682595,
+          "psnr": 27.280601367747998,
+          "ceiling": 8.087041352580298
+        },
+        {
+          "label": "gaussian 1.00 mm",
+          "d_prime": 3.7236730074944027,
+          "ratio": 0.4604493590608766,
+          "psnr": 27.34412073834993,
+          "ceiling": 8.087041352580298
+        },
+        {
+          "label": "tv 1x noise",
+          "d_prime": 5.4433024094655105,
+          "ratio": 0.6730894739061448,
+          "psnr": 27.319036993597827,
+          "ceiling": 8.087041352580298
+        },
+        {
+          "label": "nlm 0.8x noise",
+          "d_prime": 4.919431866049271,
+          "ratio": 0.6083104625747522,
+          "psnr": 26.63068188780983,
+          "ceiling": 8.087041352580298
+        },
+        {
+          "label": "CNN 21k",
+          "d_prime": 4.705233236825012,
+          "ratio": 0.5818238131456732,
+          "psnr": 27.800890911950084,
+          "ceiling": 8.087041352580298
+        },
+        {
+          "label": "GAN 21k",
+          "d_prime": 5.116759190706625,
+          "ratio": 0.6327108973016493,
+          "psnr": 26.841689549041444,
+          "ceiling": 8.087041352580298
+        },
+        {
+          "label": "CNN 1.85M",
+          "d_prime": 4.759746389837211,
+          "ratio": 0.5885646161953332,
+          "psnr": 27.948583927796943,
+          "ceiling": 8.087041352580298
+        },
+        {
+          "label": "GAN 1.85M",
+          "d_prime": 4.568331717947788,
+          "ratio": 0.5648953082810921,
+          "psnr": 26.76798040081864,
+          "ceiling": 8.087041352580298
+        }
+      ]
+    },
+    "low structure": {
+      "rule": {
+        "hu_range": [
+          0.0,
+          160.0
+        ],
+        "max_sd": 60.0,
+        "max_gradient": 40.0,
+        "structure_sd": 10.0
+      },
+      "cases": {
+        "L058": 250,
+        "L064": 229,
+        "L071": 250,
+        "L072": 24
+      },
+      "n_pairs": 753,
+      "ceiling": 7.9400251332541805,
+      "structure_sd_median": 7.515982487314768,
+      "structure_sd_p90": 9.453613540341886,
+      "structure_over_lesion_fraction": 0.0,
+      "lesion_depth_hu": 25.0,
+      "rows": [
+        {
+          "label": "unprocessed",
+          "d_prime": 4.417445182113556,
+          "ratio": 0.5563515364217856,
+          "psnr": 22.53379161643003,
+          "ceiling": 7.9400251332541805
+        },
+        {
+          "label": "gaussian 0.75 mm",
+          "d_prime": 3.439971673049884,
+          "ratio": 0.43324443126038675,
+          "psnr": 27.635610031064598,
+          "ceiling": 7.9400251332541805
+        },
+        {
+          "label": "gaussian 1.00 mm",
+          "d_prime": 3.157658350355227,
+          "ratio": 0.39768870971584397,
+          "psnr": 27.9367046745833,
+          "ceiling": 7.9400251332541805
+        },
+        {
+          "label": "tv 1x noise",
+          "d_prime": 4.5665515332086235,
+          "ratio": 0.5751306143960585,
+          "psnr": 27.813122127478184,
+          "ceiling": 7.9400251332541805
+        },
+        {
+          "label": "nlm 0.8x noise",
+          "d_prime": 3.8732877192991935,
+          "ratio": 0.48781806786444587,
+          "psnr": 27.17122856445719,
+          "ceiling": 7.9400251332541805
+        },
+        {
+          "label": "CNN 21k",
+          "d_prime": 4.236762563325447,
+          "ratio": 0.5335956111248518,
+          "psnr": 28.1618601860535,
+          "ceiling": 7.9400251332541805
+        },
+        {
+          "label": "GAN 21k",
+          "d_prime": 4.370805154430965,
+          "ratio": 0.550477496113367,
+          "psnr": 27.13947049666474,
+          "ceiling": 7.9400251332541805
+        },
+        {
+          "label": "CNN 1.85M",
+          "d_prime": 4.18234537167061,
+          "ratio": 0.5267420822327418,
+          "psnr": 28.345653767864068,
+          "ceiling": 7.9400251332541805
+        },
+        {
+          "label": "GAN 1.85M",
+          "d_prime": 3.8679640965183677,
+          "ratio": 0.48714758852823703,
+          "psnr": 27.112787781902405,
+          "ceiling": 7.9400251332541805
+        }
+      ]
+    }
+  },
+  "held_out_cases": [
+    "L058",
+    "L064",
+    "L071",
+    "L072"
+  ],
+  "quota": {
+    "L058": 250,
+    "L064": 229,
+    "L071": 250,
+    "L072": 24
+  },
+  "comparison": {
+    "spearman_rho": 0.9333333333333332,
+    "spearman_p": 0.00023589981215941643,
+    "ranking_as_published": [
+      "tv 1x noise",
+      "unprocessed",
+      "GAN 21k",
+      "nlm 0.8x noise",
+      "CNN 1.85M",
+      "CNN 21k",
+      "GAN 1.85M",
+      "gaussian 0.75 mm",
+      "gaussian 1.00 mm"
+    ],
+    "ranking_low_structure": [
+      "tv 1x noise",
+      "unprocessed",
+      "GAN 21k",
+      "CNN 21k",
+      "CNN 1.85M",
+      "nlm 0.8x noise",
+      "GAN 1.85M",
+      "gaussian 0.75 mm",
+      "gaussian 1.00 mm"
+    ],
+    "ranking_identical": false,
+    "ceiling_ratio": 0.9818207657267376
+  }
+}

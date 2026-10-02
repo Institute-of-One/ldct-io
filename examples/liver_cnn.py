@@ -81,6 +81,7 @@ from denoiq_core.cnn import (
 )
 from denoiq_core.denoisers import denoise
 from denoiq_core.evaluate import fidelity
+from denoiq_core.redlamp import contrast_recovery, false_structure_rate
 from taskiq_core import ideal_linear, nps_2d
 
 from ldct_io import (
@@ -91,6 +92,7 @@ from ldct_io import (
     paired_d_prime,
     read_image_series,
 )
+from ldct_io.adversarial import AdversarialConfig, train_adversarial
 
 ROOT = Path(os.environ.get("LDCT_IO_DATA") or r"D:\DevData\TCIA\LDCT-and-Projection-data")
 OUTDIR = Path(os.environ.get("LDCT_IO_OUT") or Path(__file__).resolve().parents[1] / "results")
@@ -123,6 +125,27 @@ PRESETS: dict[str, dict[str, Any]] = {
         lr=1e-3,
     ),
 }
+
+#: The objective of the adversarial arms, and the only thing they change.
+#:
+#: The three numbers come out of ``adv_weight_sweep.py`` and none of them was chosen a priori.
+#: A first sweep found the adversarial term doing almost nothing across a five-hundred-fold
+#: range of weights, because the pixelwise term is in units of the input's own noise and sits
+#: near 3.5 while the least-squares adversarial term is bounded near 0.25 when the critic is
+#: confused: fidelity dominates at every weight that looks reasonable. Scaling the pixelwise
+#: term down to 0.05 and letting the critic learn ten times faster makes the term bite, and the
+#: effect is then flat from adv_weight 1 to 20, so 1.0 is the least extreme value that works.
+ADVERSARIAL = AdversarialConfig(adv_weight=1.0, mse_weight=0.05, discriminator_lr=1e-3)
+
+#: Each adversarial arm is its MSE counterpart with the objective replaced and *nothing else*
+#: touched -- same architecture, same patches, same epochs, same batch, same learning rate,
+#: same seed. That is what lets fabrication, if it appears, be attributed to optimising
+#: appearance rather than to capacity, data or training length. The epoch count in particular
+#: is not raised to the sweep's thirty: the full training set is four times the sweep's, so
+#: sixteen epochs here is already twice the sweep's gradient steps, and raising it would break
+#: the control.
+for _name in ("small", "large"):
+    PRESETS[f"{_name}_gan"] = dict(PRESETS[_name], adversarial=ADVERSARIAL)
 
 
 def invertible(grid: np.ndarray, ridge: float = 1e-2, floor: float = 1e-3) -> np.ndarray:
@@ -191,13 +214,40 @@ def training_pairs(
 
 def train_network(
     x: np.ndarray, y: np.ndarray, preset: dict[str, Any], device: str
-) -> tuple[Any, int, float]:
+) -> tuple[Any, int, float, dict[str, Any] | None]:
     """Train, on the GPU if there is one, and hand the model back on the CPU.
 
     Inference goes through ``denoiq_core.cnn.denoise_stack``, which feeds CPU tensors, so the
     model comes home before it is used. One inference path for both capacities, and for
     anyone re-running this without a GPU.
+
+    A preset carrying an ``adversarial`` objective is trained by
+    :func:`ldct_io.adversarial.train_adversarial` instead, from the same schedule and the same
+    seed. The fourth return value is that run's record, or ``None`` for the MSE arms.
     """
+    if preset.get("adversarial") is not None:
+        model = build_cnn(preset["cnn"], seed=SEED)
+        n_parameters = sum(p.numel() for p in model.parameters())
+        print(
+            f"\n{n_parameters} parameters on {device}, trained against appearance: "
+            f"{preset['adversarial'].to_dict()}",
+            flush=True,
+        )
+        record = train_adversarial(
+            model,
+            x,
+            y,
+            epochs=preset["epochs"],
+            batch=preset["batch"],
+            lr=preset["lr"],
+            config=preset["adversarial"],
+            seed=SEED,
+            device=device,
+            log=lambda line: print(line, flush=True),
+        )
+        print(f"  best validation MSE {record['best_val_mse']:.5f}", flush=True)
+        return model.cpu(), n_parameters, float(record["best_val_mse"]), record
+
     torch.manual_seed(SEED)
     model = build_cnn(preset["cnn"], seed=SEED).to(device)
     n_parameters = sum(p.numel() for p in model.parameters())
@@ -249,11 +299,11 @@ def train_network(
                 flush=True,
             )
     print(f"  best validation loss {best:.5f}", flush=True)
-    return model.cpu(), n_parameters, best
+    return model.cpu(), n_parameters, best, None
 
 
 def gather_test() -> dict[str, Any]:
-    present, absent, reference, patches, used = [], [], [], [], {}
+    present, absent, reference, background, patches, used = [], [], [], [], [], {}
     signal = spacing = None
     for case in TEST_CASES:
         full = read_image_series(ROOT / case / "full_dose_images")
@@ -289,12 +339,17 @@ def gather_test() -> dict[str, Any]:
         present.append(trials.present)
         absent.append(trials.absent)
         reference.append(clean.present)
+        # The same anatomy with no lesion and no noise. This design knows the background
+        # exactly, and that is what makes it possible to ask what the *processing* put into an
+        # image rather than what the patient's liver already contained.
+        background.append(clean.absent)
         used[case] = n_take
         signal, spacing = trials.signal, trials.spacing
     return dict(
         present=np.concatenate(present),
         absent=np.concatenate(absent),
         reference=np.concatenate(reference),
+        background=np.concatenate(background),
         patches=np.concatenate(patches).astype(np.float64),
         signal=signal,
         spacing=spacing,
@@ -316,7 +371,7 @@ def main() -> int:
     print(f"train on {TRAIN_CASES}\ntest on  {TEST_CASES}\n", flush=True)
     x, y = training_pairs(TRAIN_CASES, preset["patches"])
     print(f"\n{x.shape[0]} training patches of {PATCH}x{PATCH}, normalised as at inference")
-    model, n_parameters, best_val = train_network(x, y, preset, device)
+    model, n_parameters, best_val, adversarial = train_network(x, y, preset, device)
     checkpoint = OUTDIR / f"liver_cnn_{args.preset}.pt"
     digest = save_checkpoint(
         model,
@@ -349,7 +404,11 @@ def main() -> int:
         ("gaussian 1.00 mm", lambda a: denoise(a, method="gaussian", sigma=1.0 / spacing)),
         ("tv 1x noise", lambda a: denoise(a, method="tv", weight=NOISE_HU)),
         ("nlm 0.8x noise", lambda a: denoise(a, method="nlm", h=0.8 * NOISE_HU)),
-        (f"CNN {args.preset} ({n_parameters / 1000:.0f}k)", lambda a: denoise_stack(a, model)),
+        (
+            f"{'GAN' if adversarial else 'CNN'} {args.preset.removesuffix('_gan')} "
+            f"({n_parameters / 1000:.0f}k)",
+            lambda a: denoise_stack(a, model),
+        ),
     ]
 
     rows = []
@@ -367,10 +426,52 @@ def main() -> int:
                 ]
             )
         )
-        rows.append(dict(label=label, d_prime=float(d), ratio=float(d / ceiling), psnr=psnr))
+        # The measurements the adversarial arm exists for.
+        #
+        # `false` is the paper's prespecified criterion: lesion-shaped responses in images
+        # whose lesion truth is absent, so every one of them is false. On the uniform phantom
+        # it is the whole story. On a real liver it saturates -- parenchyma contains 8 mm
+        # disc-like structure at around twice this lesion's contrast, so the rate is near one
+        # for the unprocessed input and can only fall. It is reported unchanged, because
+        # retuning a prespecified threshold once the data are in is how a result becomes an
+        # artefact of a number somebody picked.
+        #
+        # `false_added` is the measurement that has headroom, and it exists because this design
+        # knows the background exactly. Processing the lesion-free, noise-free anatomy through
+        # the same method and subtracting leaves what the method made of the noise. Anatomy
+        # cancels; every lesion-shaped structure left is one the processing put there. For a
+        # linear filter it is filtered noise. For a generator rewarded for appearance it is
+        # where fabrication would show. What cancels with the anatomy is any structure the
+        # generator invents from the anatomy alone, identically in both classes -- that is a
+        # limit of the measure, and it is the same limit for every method here.
+        #
+        # `recovery` says how much of a real lesion's contrast survives. A method that raises
+        # d' by fabricating shows a rising added rate; one that raises PSNR by erasing shows a
+        # falling recovery.
+        false = false_structure_rate(da, signal)
+        clean_background = data["background"] if fn is None else fn(data["background"])
+        false_added = false_structure_rate(da - clean_background, signal)
+        recovery = contrast_recovery(dp, da, signal)
+        rows.append(
+            dict(
+                label=label,
+                d_prime=float(d),
+                ratio=float(d / ceiling),
+                psnr=psnr,
+                false_structure_rate=false["rate"],
+                mean_max_amplitude=false["mean_max_amplitude"],
+                p95_max_amplitude=false["p95_max_amplitude"],
+                amplitude_fraction=false["amplitude_fraction"],
+                added_structure_rate=false_added["rate"],
+                added_mean_max_amplitude=false_added["mean_max_amplitude"],
+                added_p95_max_amplitude=false_added["p95_max_amplitude"],
+                contrast_recovery=recovery,
+            )
+        )
         print(
             f"  {label:20s} d' {d:6.3f}   {d / ceiling:5.2f}x ceiling   PSNR {psnr:6.2f} dB"
-            f"   ({time.time() - t0:.0f}s)",
+            f"   false {false['rate']:5.3f}   added {false_added['rate']:5.3f}"
+            f"   recovery {recovery:5.3f}   ({time.time() - t0:.0f}s)",
             flush=True,
         )
 
@@ -387,12 +488,45 @@ def main() -> int:
         f"d' {best_psnr['d_prime'] / raw['d_prime']:.2f}x the unprocessed input"
     )
 
+    # Did the network invent structure? Stated against the unprocessed input, because that is
+    # the only reference under which the number means anything.
+    learned = rows[-1]
+    fraction = learned["amplitude_fraction"]
+    print(
+        f"\nprespecified false structure at >= {fraction:.0%} of a lesion: "
+        f"{learned['label']} {learned['false_structure_rate']:.3f} "
+        f"against {raw['false_structure_rate']:.3f} unprocessed "
+        f"({learned['false_structure_rate'] - raw['false_structure_rate']:+.3f})"
+    )
+    if min(r["false_structure_rate"] for r in rows) > 0.5:
+        print(
+            "  -- every method is above one half: on real parenchyma this criterion is "
+            "saturated by\n     the anatomy and cannot rise. Read the added rate instead."
+        )
+    print(
+        f"structure the processing added, anatomy cancelled: "
+        f"{learned['added_structure_rate']:.3f} against {raw['added_structure_rate']:.3f} "
+        f"for the noise itself "
+        f"({learned['added_structure_rate'] - raw['added_structure_rate']:+.3f}); "
+        f"peak amplitude {learned['added_mean_max_amplitude']:.3f} against "
+        f"{raw['added_mean_max_amplitude']:.3f}"
+    )
+    print(
+        f"contrast recovery: {learned['contrast_recovery']:.3f} "
+        f"against {raw['contrast_recovery']:.3f} unprocessed"
+    )
+
     (OUTDIR / f"liver_cnn_{args.preset}.json").write_text(
         json.dumps(
             {
                 "train": TRAIN_CASES,
                 "test": data["used"],
                 "sha256": digest,
+                "preset": args.preset,
+                "n_parameters": int(n_parameters),
+                "epochs": preset["epochs"],
+                "best_val_loss": float(best_val),
+                "adversarial": adversarial,
                 "ceiling": ceiling,
                 "rows": rows,
             },
