@@ -40,6 +40,13 @@ dependencies = [
 [project.optional-dependencies]
 # Figures are a convenience, not part of the measurement.
 plot = ["matplotlib>=3.7"]
+# The learned arms. ldct_io.adversarial told the reader to install this extra before it
+# existed, so anyone following that message got nothing; the message is only true if the
+# extra is declared. Scoring those arms additionally needs denoiq-core and taskiq-core, which
+# are separate packages rather than dependencies: this one supplies the data and the
+# measurement, they supply the observers and the denoisers, and neither reproduces the paper
+# alone. See README.
+cnn = ["torch>=2.0", "scipy>=1.10"]
 dev = [
   "pytest>=7.0",
   "pytest-cov>=4.1",
