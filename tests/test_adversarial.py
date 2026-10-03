@@ -79,9 +79,7 @@ def test_the_critic_refuses_a_shape_it_cannot_build(depth, kernel):
 
 def test_training_reports_what_it_did():
     noisy, clean = _pairs()
-    record = train_adversarial(
-        _tiny_generator(), noisy, clean, epochs=2, batch=16, lr=1e-3, seed=0
-    )
+    record = train_adversarial(_tiny_generator(), noisy, clean, epochs=2, batch=16, lr=1e-3, seed=0)
     assert len(record["history"]["val_mse"]) == 2
     assert record["n_train_patches"] + record["n_val_patches"] == noisy.shape[0]
     assert record["generator_parameters"] > 0 and record["critic_parameters"] > 0
@@ -105,11 +103,23 @@ def test_the_adversarial_term_changes_the_network():
     """
     noisy, clean = _pairs()
     off = train_adversarial(
-        _tiny_generator(), noisy, clean, epochs=3, batch=16, lr=1e-3, seed=0,
+        _tiny_generator(),
+        noisy,
+        clean,
+        epochs=3,
+        batch=16,
+        lr=1e-3,
+        seed=0,
         config=AdversarialConfig(adv_weight=0.0),
     )
     on = train_adversarial(
-        _tiny_generator(), noisy, clean, epochs=3, batch=16, lr=1e-3, seed=0,
+        _tiny_generator(),
+        noisy,
+        clean,
+        epochs=3,
+        batch=16,
+        lr=1e-3,
+        seed=0,
         config=AdversarialConfig(adv_weight=0.5),
     )
     assert off["generator_sha256"] != on["generator_sha256"]
@@ -125,11 +135,23 @@ def test_the_adversarial_arm_pays_for_it_in_mse():
     """
     noisy, clean = _pairs(n=128)
     fidelity = train_adversarial(
-        _tiny_generator(), noisy, clean, epochs=6, batch=16, lr=1e-3, seed=0,
+        _tiny_generator(),
+        noisy,
+        clean,
+        epochs=6,
+        batch=16,
+        lr=1e-3,
+        seed=0,
         config=AdversarialConfig(adv_weight=0.0),
     )
     appearance = train_adversarial(
-        _tiny_generator(), noisy, clean, epochs=6, batch=16, lr=1e-3, seed=0,
+        _tiny_generator(),
+        noisy,
+        clean,
+        epochs=6,
+        batch=16,
+        lr=1e-3,
+        seed=0,
         config=AdversarialConfig(adv_weight=1.0),
     )
     assert appearance["best_val_mse"] >= fidelity["best_val_mse"]

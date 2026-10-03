@@ -142,9 +142,7 @@ def test_calibration_is_monotone_in_the_target():
 def test_calibration_refuses_a_target_outside_its_bracket():
     p = _flat(2.0, (128, 128))
     with pytest.raises(ValueError):
-        calibrate_incident_counts(
-            p, _toy_reconstruct, 1e-9, seed=0, bracket=(1e2, 1e4)
-        )
+        calibrate_incident_counts(p, _toy_reconstruct, 1e-9, seed=0, bracket=(1e2, 1e4))
 
 
 @pytest.mark.parametrize("bad", [0.0, -1.0, float("nan")])

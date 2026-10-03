@@ -1,4 +1,4 @@
-"""Where the dose can be conceded, and what denoising does not give back.
+r"""Where the dose can be conceded, and what denoising does not give back.
 
 The question this answers
 ------------------------
@@ -77,15 +77,19 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+import sys  # noqa: E402
+
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from denoiq_core.cnn import denoise_stack, load_checkpoint  # noqa: E402
 from denoiq_core.denoisers import denoise  # noqa: E402
 from denoiq_core.evaluate import fidelity  # noqa: E402
-from denoiq_core.redlamp import DEFAULT_CRITERIA, contrast_recovery, false_structure_rate  # noqa: E402
+from denoiq_core.redlamp import (  # noqa: E402
+    DEFAULT_CRITERIA,
+    contrast_recovery,
+    false_structure_rate,
+)
 from taskiq_core import ideal_linear, nps_2d  # noqa: E402
-
-import sys  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from liver_cnn import (  # noqa: E402
@@ -103,7 +107,12 @@ from liver_cnn import (  # noqa: E402
     invertible,
 )
 
-from ldct_io import homogeneous_sites, make_paired_trials, noise_only, read_image_series  # noqa: E402
+from ldct_io import (  # noqa: E402
+    homogeneous_sites,
+    make_paired_trials,
+    noise_only,
+    read_image_series,
+)
 
 #: Dose fractions of the routine protocol. Centred on the collection's own simulated fraction so
 #: that one point on the axis is measured noise at its native amplitude and the rest are scaled.
@@ -122,7 +131,7 @@ def noise_scale(beta: float, alpha: float) -> float:
 
 
 def dose_for_requirement(beta: float, measured: float, requirement: float) -> float:
-    r"""The dose fraction at which a method reaching ``measured`` at ``beta`` would reach ``requirement``.
+    r"""The dose fraction at which a method measuring ``measured`` would reach ``requirement``.
 
     From :math:`d' \propto 1/\sqrt{1/\beta - 1}`:
 
@@ -341,9 +350,7 @@ def main(argv: list[str] | None = None) -> int:
     for label, _ in methods:
         rows_for = [r for r in table if r["label"] == label]
         products = [r["d_prime"] * r["noise_scale"] for r in rows_for]
-        near = [
-            r["d_prime"] * r["noise_scale"] for r in rows_for if r["dose"] <= DOSE + 1e-9
-        ]
+        near = [r["d_prime"] * r["noise_scale"] for r in rows_for if r["dose"] <= DOSE + 1e-9]
         spread = (max(products) - min(products)) / float(np.mean(products))
         spread_near = (max(near) - min(near)) / float(np.mean(near)) if len(near) > 1 else 0.0
         law[label] = {
@@ -361,7 +368,9 @@ def main(argv: list[str] | None = None) -> int:
     ceiling_spread = (max(ceiling_products) - min(ceiling_products)) / float(
         np.mean(ceiling_products)
     )
-    print(f"    {'ceiling':18s} mean {np.mean(ceiling_products):6.3f}   spread {ceiling_spread:5.1%}")
+    print(
+        f"    {'ceiling':18s} mean {np.mean(ceiling_products):6.3f}   spread {ceiling_spread:5.1%}"
+    )
 
     # --- the decision --------------------------------------------------------------------
     crossing: dict[str, float] = {}
@@ -380,7 +389,6 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     at_nominal = [r for r in table if abs(r["dose"] - DOSE) < 1e-9]
-    raw = next(r for r in at_nominal if r["label"] == "unprocessed")
     raw_crossing = crossing["unprocessed"]
     print(f"\nThe decision. Dose at which d' falls to {requirement:.0f}, measured:")
     print(
@@ -399,7 +407,8 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"\nDoing nothing meets the requirement down to {raw_crossing:.3f} of the routine dose. "
         f"Of the {len(crossing) - 1} processed\narms, {len(costlier)} need *more* dose than that "
-        f"to meet it" + (f" (up to {max(crossing.values()) / raw_crossing - 1.0:+.0%})" if costlier else "")
+        f"to meet it"
+        + (f" (up to {max(crossing.values()) / raw_crossing - 1.0:+.0%})" if costlier else "")
         + f", and none needs less than "
         f"{min(crossing.values()) / raw_crossing - 1.0:+.0%}. Processing does not buy exposure."
     )
@@ -410,16 +419,17 @@ def main(argv: list[str] | None = None) -> int:
     print(f"    {'dose':>6s}  {header}   task met?")
     for beta in doses:
         at = {r["label"]: r for r in table if r["dose"] == beta}
-        claims = "  ".join(
-            f"{at[label]['apparent_dose'] / beta:9.2f}" for label, _ in methods[1:]
-        )
+        claims = "  ".join(f"{at[label]['apparent_dose'] / beta:9.2f}" for label, _ in methods[1:])
         met = sum(1 for r in at.values() if r["meets_requirement"])
         print(f"    {beta:6.3f}  {claims}   {met}/{len(at)}")
-    worst = max(table, key=lambda r: r["apparent_dose"] / r["dose"] if not r["meets_requirement"] else 0)
+    worst = max(
+        table, key=lambda r: r["apparent_dose"] / r["dose"] if not r["meets_requirement"] else 0
+    )
     print(
         f"\nThe overstatement grows as the exposure falls, so it is largest where the task has\n"
         f"already been lost: at {worst['dose']:.3f} of routine, {worst['label']} looks like "
-        f"{worst['apparent_dose']:.3f}\n({worst['apparent_dose'] / worst['dose']:.1f}x the exposure "
+        f"{worst['apparent_dose']:.3f}\n"
+        f"({worst['apparent_dose'] / worst['dose']:.1f}x the exposure "
         f"it was given) and delivers d' {worst['d_prime']:.2f} against the "
         f"{requirement:.0f} required."
     )
@@ -452,7 +462,7 @@ def _figure(
     data: dict[str, Any],
     crossing: dict[str, float],
 ) -> None:
-    """Detectability against dose, with the requirement and the apparent dose of the best-looking method."""
+    """Detectability against dose, with the requirement and each arm's apparent dose."""
     fig, (ax, bx) = plt.subplots(1, 2, figsize=(11.5, 4.8))
     labels = []
     for row in table:

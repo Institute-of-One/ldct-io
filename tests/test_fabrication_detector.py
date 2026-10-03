@@ -125,9 +125,7 @@ def anatomy_driven_fabricator(
     about the hypothesis.
     """
     out = _smooth(stack)
-    return np.stack(
-        [_stamp_at(p, signal, *_peak_of(p, RADIUS_PX), amplitude) for p in out]
-    )
+    return np.stack([_stamp_at(p, signal, *_peak_of(p, RADIUS_PX), amplitude) for p in out])
 
 
 def noise_driven_fabricator(
@@ -143,7 +141,7 @@ def noise_driven_fabricator(
     return np.stack(
         [
             _stamp_at(p, signal, *_peak_of(d, 1.0), amplitude)
-            for p, d in zip(out, detail)
+            for p, d in zip(out, detail, strict=True)
         ]
     )
 

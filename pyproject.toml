@@ -50,8 +50,10 @@ cnn = ["torch>=2.0", "scipy>=1.10"]
 dev = [
   "pytest>=7.0",
   "pytest-cov>=4.1",
-  "ruff>=0.4",
-  "mypy>=1.8",
+  # Pinned with ==, not >=. A floating ruff installs a version that formats differently
+  # and turns CI red; the failing lint step then stops the type check running at all.
+  "ruff==0.16.6",
+  "mypy==2.2.0",
   "matplotlib>=3.7",
 ]
 
@@ -104,6 +106,9 @@ strict = true
 warn_return_any = false
 
 [[tool.mypy.overrides]]
-module = ["scipy.*", "pydicom.*", "matplotlib.*"]
+# torch is an optional extra, so the type checker runs without it and sees nn.Module as Any.
+# The adversarial module is guarded at runtime by _require_torch, which raises a clear error
+# when it is absent; what mypy cannot see here is absence, not a mistake.
+module = ["scipy.*", "pydicom.*", "matplotlib.*", "torch.*"]
 ignore_missing_imports = true
 follow_imports = "skip"

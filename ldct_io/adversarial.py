@@ -187,7 +187,10 @@ def build_discriminator(config: DiscriminatorConfig, *, seed: int = 0) -> Any:
         channels = min(channels * 2, int(config.max_width))
     layers.append(nn.Conv2d(in_channels, 1, config.kernel_size, stride=1, padding=padding))
 
-    class PatchCritic(nn.Module):
+    # torch is an optional extra, imported at call time by _require_torch, so `nn` is a local
+    # name and the type checker -- which runs without torch installed -- cannot resolve the base
+    # class. What it is reporting is the absence of an optional dependency, not a mistake.
+    class PatchCritic(nn.Module):  # type: ignore[name-defined, misc]
         """Strided convolutions to a one-channel map, averaged."""
 
         def __init__(self) -> None:
@@ -313,9 +316,10 @@ def train_adversarial(
 
             # Then the generator, rewarded for a critic score near `real`.
             opt_g.zero_grad(set_to_none=True)
-            loss_g = float(settings.mse_weight) * mse(produced, clean) + float(
-                settings.adv_weight
-            ) * 0.5 * ((critic(produced) - real) ** 2).mean()
+            loss_g = (
+                float(settings.mse_weight) * mse(produced, clean)
+                + float(settings.adv_weight) * 0.5 * ((critic(produced) - real) ** 2).mean()
+            )
             loss_g.backward()
             opt_g.step()
 

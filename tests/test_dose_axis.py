@@ -136,8 +136,8 @@ def test_the_required_dose_inverts_the_scaling_law():
     """Solve for the dose, scale the noise to it, and the detectability must be the requirement."""
     beta, measured, requirement = 0.25, 6.025, 5.0
     target = dose_decision.dose_for_requirement(beta, measured, requirement)
-    predicted = measured * dose_decision.noise_scale(beta, 0.25) / dose_decision.noise_scale(
-        target, 0.25
+    predicted = (
+        measured * dose_decision.noise_scale(beta, 0.25) / dose_decision.noise_scale(target, 0.25)
     )
     assert predicted == pytest.approx(requirement)
 

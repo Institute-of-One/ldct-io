@@ -1,4 +1,4 @@
-"""Reduce the dose of a measured scan where the dose actually lives: in the photon counts.
+r"""Reduce the dose of a measured scan where the dose actually lives: in the photon counts.
 
 Why this exists
 ---------------
@@ -27,6 +27,8 @@ electronic noise stops being negligible, it will be optimistic.
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
 
 import numpy as np
 
@@ -97,7 +99,7 @@ def noise_scale_factor(dose_fraction: float) -> float:
 
 def calibrate_incident_counts(
     sinogram: np.ndarray,
-    reconstruct,
+    reconstruct: Callable[[np.ndarray], np.ndarray],
     target_noise_sd: float,
     *,
     region: tuple[slice, slice] | None = None,

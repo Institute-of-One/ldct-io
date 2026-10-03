@@ -31,6 +31,11 @@ from ldct_io.dicomctpd import (
     directory_digest,
     index_series,
 )
+from ldct_io.dose import (
+    calibrate_incident_counts,
+    insert_quantum_noise,
+    noise_scale_factor,
+)
 from ldct_io.edge import CircleFit, RadialMTF, fit_edge_circle, radial_mtf
 from ldct_io.geometry import ScanGeometry, ViewTable
 from ldct_io.helical import (
@@ -39,11 +44,6 @@ from ldct_io.helical import (
     row_window,
     wfbp_from_series,
     wfbp_slice,
-)
-from ldct_io.dose import (
-    calibrate_incident_counts,
-    insert_quantum_noise,
-    noise_scale_factor,
 )
 from ldct_io.lesion import (
     LesionTrials,

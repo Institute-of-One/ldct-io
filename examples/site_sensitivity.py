@@ -1,4 +1,4 @@
-"""Does the held-out ranking survive a site rule that actually selects parenchyma?
+"""Does the held-out ranking survive a site rule that selects parenchyma.
 
 Why
 ---
@@ -58,7 +58,12 @@ from liver_cnn import (  # noqa: E402
     invertible,
 )
 
-from ldct_io import homogeneous_sites, make_paired_trials, noise_only, read_image_series  # noqa: E402
+from ldct_io import (  # noqa: E402
+    homogeneous_sites,
+    make_paired_trials,
+    noise_only,
+    read_image_series,
+)
 
 #: The two admission rules. ``structure_sd`` is applied after the library's own criteria: it is
 #: the standard deviation of the ROI after a 2-pixel blur, which removes the quantum noise and
@@ -77,7 +82,12 @@ RULES: dict[str, dict[str, Any]] = {
     "low structure": dict(hu_range=(0.0, 160.0), max_sd=60.0, max_gradient=40.0, structure_sd=10.0),
 }
 
-NETWORKS = (("small", "CNN 21k"), ("small_gan", "GAN 21k"), ("large", "CNN 1.85M"), ("large_gan", "GAN 1.85M"))
+NETWORKS = (
+    ("small", "CNN 21k"),
+    ("small_gan", "GAN 21k"),
+    ("large", "CNN 1.85M"),
+    ("large_gan", "GAN 1.85M"),
+)
 
 
 def structure_of(patch: np.ndarray) -> float:
@@ -209,7 +219,13 @@ def evaluate(data: dict[str, Any]) -> list[dict[str, Any]]:
             )
         )
         rows.append(
-            dict(label=label, d_prime=float(d), ratio=float(d / ceiling), psnr=psnr, ceiling=float(ceiling))
+            dict(
+                label=label,
+                d_prime=float(d),
+                ratio=float(d / ceiling),
+                psnr=psnr,
+                ceiling=float(ceiling),
+            )
         )
         print(
             f"    {label:18s} d' {d:6.3f}  {d / ceiling:5.2f}x  PSNR {psnr:6.2f} dB"
@@ -251,9 +267,7 @@ def main(argv: list[str] | None = None) -> int:
             # How often the anatomy inside a site is deeper than the thing being looked for.
             # The lesion is LESION_HU deep, so this is the fraction of backgrounds carrying
             # structure larger than the signal.
-            "structure_over_lesion_fraction": float(
-                np.mean(data["structure"] > abs(LESION_HU))
-            ),
+            "structure_over_lesion_fraction": float(np.mean(data["structure"] > abs(LESION_HU))),
             "lesion_depth_hu": abs(float(LESION_HU)),
             "rows": rows,
         }
@@ -275,7 +289,7 @@ def main(argv: list[str] | None = None) -> int:
     }
 
     print("\n\nranking by d', as published -> parenchyma")
-    for i, (x, y) in enumerate(zip(order_a, order_b), start=1):
+    for i, (x, y) in enumerate(zip(order_a, order_b, strict=True), start=1):
         mark = "  " if x == y else "<-"
         print(f"  {i}. {x:18s} {mark} {y}")
     print(f"\nSpearman between the two d' vectors: rho = {rho:+.3f} (p = {p:.3f})")

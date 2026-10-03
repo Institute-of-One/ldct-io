@@ -38,13 +38,13 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+import sys  # noqa: E402
+
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from denoiq_core.cnn import denoise_stack, load_checkpoint  # noqa: E402
 from denoiq_core.denoisers import denoise  # noqa: E402
 from scipy.ndimage import gaussian_filter  # noqa: E402
-
-import sys  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from liver_cnn import (  # noqa: E402
@@ -60,7 +60,12 @@ from liver_cnn import (  # noqa: E402
     TEST_CASES,
 )
 
-from ldct_io import homogeneous_sites, make_paired_trials, noise_only, read_image_series  # noqa: E402
+from ldct_io import (  # noqa: E402
+    homogeneous_sites,
+    make_paired_trials,
+    noise_only,
+    read_image_series,
+)
 
 #: Abdominal window for the context slice, in HU: the one a whole abdomen is read at.
 WINDOW = (-40.0 - 200.0, -40.0 + 200.0)
@@ -162,7 +167,11 @@ def main(argv: list[str] | None = None) -> int:
         ]
     )
     median_structure = float(np.median(structure))
-    i = int(np.argmin(np.abs(structure - median_structure))) if args.trial is None else int(args.trial)
+    i = (
+        int(np.argmin(np.abs(structure - median_structure)))
+        if args.trial is None
+        else int(args.trial)
+    )
     present = trials.present[i : i + 1]
     absent = trials.absent[i : i + 1]
     reference = clean.present[i]
@@ -181,9 +190,7 @@ def main(argv: list[str] | None = None) -> int:
     context = fig.add_subplot(grid[:, 0])
     context.imshow(full.volume[slice_index], cmap="gray", vmin=WINDOW[0], vmax=WINDOW[1])
     context.add_patch(
-        plt.Rectangle(
-            (col - half, row - half), ROI, ROI, fill=False, edgecolor="C1", lw=1.4
-        )
+        plt.Rectangle((col - half, row - half), ROI, ROI, fill=False, edgecolor="C1", lw=1.4)
     )
     context.set_title(
         f"{args.case}, routine dose\nslice {slice_index}", fontsize=8, linespacing=1.3
@@ -213,9 +220,7 @@ def main(argv: list[str] | None = None) -> int:
                 row_scores = scores.get(label, {})
                 caption = name
                 if row_scores:
-                    caption += (
-                        f"\n$d'$ {row_scores['d_prime']:.2f}   {row_scores['psnr']:.1f} dB"
-                    )
+                    caption += f"\n$d'$ {row_scores['d_prime']:.2f}   {row_scores['psnr']:.1f} dB"
                 ax.set_title(caption, fontsize=8, linespacing=1.3)
 
     fig.text(0.013, 0.72, "lesion\npresent", fontsize=8, ha="left", va="center")
@@ -228,7 +233,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     fig.subplots_adjust(left=0.055, right=0.995, top=0.88, bottom=0.01)
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(args.out, dpi=200)
+    fig.savefig(args.out, dpi=300)
     print(f"wrote {args.out}")
     print(f"  case {args.case}, slice {slice_index}, site ({row}, {col}), trial {i}")
     print(f"  reference mean {reference.mean():.1f} HU, window {WINDOW[0]:.0f} to {WINDOW[1]:.0f}")

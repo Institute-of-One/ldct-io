@@ -51,9 +51,9 @@ from typing import Any
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from denoiq_core.cnn import build_cnn  # noqa: E402
 from liver_cnn import OUTDIR, PRESETS, SEED, TRAIN_CASES, training_pairs  # noqa: E402
 
-from denoiq_core.cnn import build_cnn  # noqa: E402
 from ldct_io.adversarial import AdversarialConfig, train_adversarial  # noqa: E402
 
 #: Enough patches for the regimes to separate, few enough that the sweep is an afternoon and
@@ -81,7 +81,8 @@ def diagnostics(output: np.ndarray, target: np.ndarray) -> dict[str, float]:
     flat_out = output.reshape(output.shape[0], -1)
     flat_ref = target.reshape(target.shape[0], -1)
     correlations = [
-        float(np.corrcoef(a - a.mean(), b - b.mean())[0, 1]) for a, b in zip(flat_out, flat_ref)
+        float(np.corrcoef(a - a.mean(), b - b.mean())[0, 1])
+        for a, b in zip(flat_out, flat_ref, strict=True)
     ]
     return {
         "texture_ratio": sd_out / sd_ref if sd_ref > 0 else float("nan"),
@@ -147,9 +148,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         generator.eval()
         with torch.no_grad():
-            produced = (
-                generator(torch.from_numpy(x_eval).unsqueeze(1)).squeeze(1).numpy()
-            )
+            produced = generator(torch.from_numpy(x_eval).unsqueeze(1)).squeeze(1).numpy()
         row = {
             "adv_weight": float(weight),
             "mse_weight": float(args.mse_weight),
@@ -190,8 +189,10 @@ def main(argv: list[str] | None = None) -> int:
         + "\n",
         encoding="utf-8",
     )
-    print(f"\nunprocessed: texture {baseline['texture_ratio']:.3f}, "
-          f"registration {baseline['registration']:.3f}")
+    print(
+        f"\nunprocessed: texture {baseline['texture_ratio']:.3f}, "
+        f"registration {baseline['registration']:.3f}"
+    )
     print(f"wrote {out}")
     print(
         "\nRead it this way: the weight to use is the largest one whose registration is still "
