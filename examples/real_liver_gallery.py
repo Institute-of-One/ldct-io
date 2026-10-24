@@ -198,9 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     # of the figure. The context column is given more width than an arm because it carries a
     # whole slice rather than a 48-pixel region.
     fig = plt.figure(figsize=(COLUMN_INCHES, 2.85))
-    grid = fig.add_gridspec(
-        2, n, hspace=0.05, wspace=0.04, width_ratios=(1.7,) + (1.0,) * (n - 1)
-    )
+    grid = fig.add_gridspec(2, n, hspace=0.05, wspace=0.04, width_ratios=(1.7,) + (1.0,) * (n - 1))
 
     # The context panel: the whole slice, with the region the measurement was made in.
     context = fig.add_subplot(grid[:, 0])
@@ -238,8 +236,7 @@ def main(argv: list[str] | None = None) -> int:
                 if row_scores:
                     # One quantity per line. Side by side they ran wider than a panel once the
                     # figure was drawn at its printed width, and two labels met in the middle.
-                    caption += (f"\n$d'$ {row_scores['d_prime']:.2f}"
-                                f"\n{row_scores['psnr']:.1f} dB")
+                    caption += f"\n$d'$ {row_scores['d_prime']:.2f}\n{row_scores['psnr']:.1f} dB"
                 ax.set_title(caption, fontsize=7, linespacing=1.25)
 
     fig.text(0.008, 0.60, "lesion\npresent", fontsize=7, ha="left", va="center")
