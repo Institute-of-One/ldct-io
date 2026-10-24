@@ -67,6 +67,11 @@ from ldct_io import (  # noqa: E402
     read_image_series,
 )
 
+#: The column this figure prints into, in inches, and therefore the width it is drawn at.
+#: A figure wider than its column is reduced by the converter, and the type is reduced with
+#: it; the manuscript's gate measures the file and refuses anything under x0.70.
+COLUMN_INCHES = 6.5
+
 #: Abdominal window for the context slice, in HU: the one a whole abdomen is read at.
 WINDOW = (-40.0 - 200.0, -40.0 + 200.0)
 
@@ -182,9 +187,20 @@ def main(argv: list[str] | None = None) -> int:
     centre = float(reference.mean())
     panel = (centre - PANEL_WINDOW_WIDTH / 2.0, centre + PANEL_WINDOW_WIDTH / 2.0)
 
+    # Drawn at the width it prints into, not at a comfortable drawing width. At 2.05 in per
+    # column this was 12.3 in wide; a 6.5 in column reduces that to x0.53 and takes the 8 pt
+    # panel labels down to about 4 pt, which is the size at which a reader stops reading. The
+    # type sizes below are set for this width: shrink the figure further and they have to come
+    # down with it. paper/presubmission_check.py measures the file and refuses it below x0.70.
     n = len(ARMS) + 1
-    fig = plt.figure(figsize=(2.05 * n, 5.0))
-    grid = fig.add_gridspec(2, n, hspace=0.06, wspace=0.04)
+    # Height follows width: the region panels are square, so two rows of them are twice a
+    # column wide, and anything more than that plus the titles is a white band down the middle
+    # of the figure. The context column is given more width than an arm because it carries a
+    # whole slice rather than a 48-pixel region.
+    fig = plt.figure(figsize=(COLUMN_INCHES, 2.85))
+    grid = fig.add_gridspec(
+        2, n, hspace=0.05, wspace=0.04, width_ratios=(1.7,) + (1.0,) * (n - 1)
+    )
 
     # The context panel: the whole slice, with the region the measurement was made in.
     context = fig.add_subplot(grid[:, 0])
@@ -193,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
         plt.Rectangle((col - half, row - half), ROI, ROI, fill=False, edgecolor="C1", lw=1.4)
     )
     context.set_title(
-        f"{args.case}, routine dose\nslice {slice_index}", fontsize=8, linespacing=1.3
+        f"{args.case}, routine dose\nslice {slice_index}", fontsize=7, linespacing=1.25
     )
     context.set_xticks([])
     context.set_yticks([])
@@ -220,18 +236,24 @@ def main(argv: list[str] | None = None) -> int:
                 row_scores = scores.get(label, {})
                 caption = name
                 if row_scores:
-                    caption += f"\n$d'$ {row_scores['d_prime']:.2f}   {row_scores['psnr']:.1f} dB"
-                ax.set_title(caption, fontsize=8, linespacing=1.3)
+                    # One quantity per line. Side by side they ran wider than a panel once the
+                    # figure was drawn at its printed width, and two labels met in the middle.
+                    caption += (f"\n$d'$ {row_scores['d_prime']:.2f}"
+                                f"\n{row_scores['psnr']:.1f} dB")
+                ax.set_title(caption, fontsize=7, linespacing=1.25)
 
-    fig.text(0.013, 0.72, "lesion\npresent", fontsize=8, ha="left", va="center")
-    fig.text(0.013, 0.28, "lesion\nabsent", fontsize=8, ha="left", va="center")
+    fig.text(0.008, 0.60, "lesion\npresent", fontsize=7, ha="left", va="center")
+    fig.text(0.008, 0.21, "lesion\nabsent", fontsize=7, ha="left", va="center")
+    # What the panels show, not what they mean. The clause that used to close this line -- "the
+    # image improves from left to right, the task does not" -- is a result, and a result drawn
+    # inside a figure is a result a reader cannot check against the text. It is in the caption
+    # and in Results, where a reader can.
     fig.suptitle(
-        "One held-out site at a quarter of the routine dose: the image improves from left to "
-        "right, the task does not",
-        fontsize=9,
+        "One held-out site at a quarter of the routine dose",
+        fontsize=8,
         y=0.985,
     )
-    fig.subplots_adjust(left=0.055, right=0.995, top=0.88, bottom=0.01)
+    fig.subplots_adjust(left=0.085, right=0.995, top=0.78, bottom=0.01)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.out, dpi=300)
     print(f"wrote {args.out}")
